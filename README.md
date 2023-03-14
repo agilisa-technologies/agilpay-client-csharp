@@ -6,8 +6,12 @@ Agilpay client class c#
 The Web Services Module consists of web services accessible via HTTP / HTTPS, which can be used by external channels or systems to perform operations on the System on the Gateway server.
 
 Web Services can be accessed through standard protocols, such as REST
-
 Endpoint authentication uses OAUTH 2.0 standard
+
+This repository includes 2 projects
+* agilpay.client class: sample implementation to connect to Agilpay REST API
+* console-sample: console application to test agilpay.client class
+
 
 # Available endpoints
 
