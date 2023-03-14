@@ -9,7 +9,7 @@ Web Services can be accessed through standard protocols, such as REST
 
 Endpoint authentication uses OAUTH 2.0 standard
 
-# Available endpints
+# Available endpoints
 
 * OAuth Autentication (init)
 * Authorize
