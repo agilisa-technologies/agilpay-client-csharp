@@ -1,7 +1,7 @@
 # agilpay-client-csharp
 Agilpay client class c#
 
-#Client class for Agilpay REST API service  
+# Client class for Agilpay REST API service  
 
 The Web Services Module consists of web services accessible via HTTP / HTTPS, which can be used by external channels or systems to perform operations on the System on the Gateway server.
 
