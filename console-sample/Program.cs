@@ -13,7 +13,13 @@ namespace TestTransaction
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine("Agilpay API Client. Test console\n");
 
-            var client = new agilpay.ApiClient("https://sandbox-webapi.agilpay.net/");
+            Console.Write("URL [https://sandbox-webapi.agilpay.net/]:");
+
+            var _url = Console.ReadLine();
+            _url = string.IsNullOrEmpty(_url) ? "https://sandbox-webapi.agilpay.net/" : _url;
+
+
+            var client = new agilpay.ApiClient(_url);
 
             // OAUTH 2.0
             bool result = false;
@@ -45,6 +51,20 @@ namespace TestTransaction
             Console.Write("Customer Account [123456]:");
             var customer_id = Console.ReadLine();
             customer_id = string.IsNullOrEmpty(customer_id) ? "123456" : customer_id;
+
+            var resultTokens = await client.GetCustomerTokens(customer_id);
+            if (resultTokens != null)
+            {
+                foreach (var item in resultTokens)
+                {
+                    Console.WriteLine($"{item.Account}");
+                }
+            }
+            else
+            {
+                Console.WriteLine("No tokens found");
+            }
+
 
             var balanceRequest = new BalanceRequest()
             {

@@ -78,11 +78,38 @@ namespace agilpay
             return null;
         }
 
+        public async Task<List<CustomerAccount>> GetCustomerTokens(string CustomerID)
+        {
+            try
+            {
+                var request = new RestRequest("Payment5/GetCustomerTokens");
+                SetHeader(request);
+
+                request.AddParameter("CustomerID", CustomerID);
+
+                RestResponse response = await client.GetAsync(request);
+                if (response.IsSuccessStatusCode && response.Content != null)
+                {
+                    var rest = JsonConvert.DeserializeObject<List<CustomerAccount>>(response.Content);
+                    return rest;
+                }
+                else
+                {
+                    Console.WriteLine(response.Content);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+            return null;
+        }
+
         public async Task<BalanceResponse> GetBalance(BalanceRequest balanceRequest)
         {
             try
             {
-                var request = new RestRequest("v6/GetBalance");
+                var request = new RestRequest("Payment6/GetBalance");
                 SetHeader(request);
 
                 request.AddJsonBody(balanceRequest);
