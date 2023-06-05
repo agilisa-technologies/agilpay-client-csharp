@@ -40,8 +40,8 @@ namespace agilpay
                 request.AddParameter("client_secret", _clientSecret);
 
                 TokenResponse response = await client.PostAsync<TokenResponse>(request);
-
-                result = $"{response.TokenType} {response!.AccessToken}";
+                if (response.IsSuccessStatusCode && response.Content != null)
+                    result = $"{response.TokenType} {response!.AccessToken}";
             }
             catch (Exception ex)
             {

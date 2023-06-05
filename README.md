@@ -37,5 +37,13 @@ For authentication, this information must be provided to the Init method, the id
 * client_id: Uniquely identifies the client requesting the token
 * client_secret: Password used to authenticate the token request
 
-`result = await client.Init(client_id, secret);`
+``` csharp
+var result = await client.Init(client_id, secret);
+if (result){
+    Console.WriteLine($"Initialization Success. OAuth token: {client.Token}");
+    /* transaction code here */
+} else {
+    Console.WriteLine("Initialization failed");
+}
+```
 
