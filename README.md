@@ -26,10 +26,8 @@ The environment URL must be supplied on class initialization
 * for test environment: https://sandbox-webpay.agilpay.net/ 
 * for production environment: https://webpay.agilpay.net/ 
 
-`
-_url = "https://sandbox-webapi.agilpay.net/";
-var client = new agilpay.ApiClient(_url);
-`
+`_url = "https://sandbox-webapi.agilpay.net/";`
+`var client = new agilpay.ApiClient(_url);`
 
 > URL address could change depending on configuration. Please check with your account representative
 
