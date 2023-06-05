@@ -16,17 +16,21 @@ This repository includes 2 projects
 # Available endpoints
 
 * OAuth Autentication (init)
-* Authorize
 * Balance
+* Authorize
+* AuthorizeToken
 
-# Generating authentication tokens
+# Initializing library
 
-For authentication, this information must be provided to the token endpoint. If the provided credentials are valid, the identity provider will issue a token to the requesting application.
-* grant_type: client_credentials
+The environment URL must be supplied on class initialization
+* for test environment: https://sandbox-webpay.agilpay.net/
+* for production environment: https://sandbox-webpay.agilpay.net/
+
+> URL address could change depending on configuration. Please check with your account representative
+
+For authentication, this information must be provided to the Init method, the identity provider will issue a token to the requesting application.
 * client_id: Uniquely identifies the client requesting the token
 * client_secret: Password used to authenticate the token request
 
-Each response message will the following data:
-* access_token: unique value that must be sent on every api call as a bearer token
-* token_type: bearer
-* expires_in: token expiration time
+`result = await client.Init(client_id, secret);`
+
