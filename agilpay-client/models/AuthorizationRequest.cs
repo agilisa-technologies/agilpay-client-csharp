@@ -3,7 +3,7 @@
     public class AuthorizationRequest
     {
         public string MerchantKey { get; set; }
-        public string AccountType { get; set; }
+        public AccountType AccountType { get; set; }
         public string AccountNumber { get; set; }
         public string RoutingNumber { get; set; }
         public DateTime? EffectiveDate { get; set; }

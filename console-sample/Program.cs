@@ -95,7 +95,7 @@ namespace TestTransaction
                 ExpirationYear = "29",
                 CustomerName = "Test User",
                 CustomerID = customer_id,
-                AccountType = "1", 
+                AccountType = agilpay.AccountType.Credit_Debit, 
                 CustomerEmail = "testuser@gmail.com",
                 ZipCode = "33167",
                 Amount = amount,

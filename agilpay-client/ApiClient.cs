@@ -24,11 +24,11 @@ namespace agilpay
             session_id = Guid.NewGuid().ToString();
             ClientId = clientId;
             ClientSecret = clientSecret;
-            Token = await GetTokenAsync(BaseUrl, ClientId, ClientSecret);
+            Token = await GetOAuth2TokenAsync(BaseUrl, ClientId, ClientSecret);
             return (Token != null);
         }
 
-        public async Task<string> GetTokenAsync(string _baseUrl, string _clientId, string _clientSecret)
+        public async Task<string> GetOAuth2TokenAsync(string _baseUrl, string _clientId, string _clientSecret)
         {
             string result = null;
             try
@@ -56,6 +56,33 @@ namespace agilpay
             try
             {
                 var request = new RestRequest("v6/Authorize");
+                SetHeader(request);
+
+                request.AddJsonBody(AuthorizationRequest);
+
+                RestResponse response = await client.PostAsync(request);
+                if (response.IsSuccessStatusCode && response.Content != null)
+                {
+                    var rest = JsonConvert.DeserializeObject<AuthorizationResponse>(response.Content);
+                    return rest;
+                }
+                else
+                {
+                    Console.WriteLine(response.Content);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+            return null;
+        }
+
+        public async Task<AuthorizationResponse> AuthorizeToken(AuthorizationTokenRequest AuthorizationRequest)
+        {
+            try
+            {
+                var request = new RestRequest("v6/AuthorizeToken");
                 SetHeader(request);
 
                 request.AddJsonBody(AuthorizationRequest);
