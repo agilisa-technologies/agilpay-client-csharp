@@ -24,7 +24,7 @@ This repository includes 2 projects
 
 The environment URL must be supplied on class initialization
 * for test environment: https://sandbox-webpay.agilpay.net/
-* for production environment: https://sandbox-webpay.agilpay.net/
+* for production environment: https://webpay.agilpay.net/
 
 > URL address could change depending on configuration. Please check with your account representative
 
