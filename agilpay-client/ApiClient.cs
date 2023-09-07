@@ -1,162 +1,294 @@
 ﻿using agilpay.models;
 using Newtonsoft.Json;
 using RestSharp;
+using System.Net;
+using System.Net.Http;
+using System.Text;
+using System.Web;
 
 namespace agilpay
 {
     public class ApiClient
     {
-        public string ClientId { get; set; }
-        public string ClientSecret { get; set; }
-        public string Token { get; set; }
-        public string BaseUrl { get; set; }
-        private RestClient client { get; set; }
-        private string session_id { get; set; }
+        private static string ClientId { get; set; }
+        private static string ClientSecret { get; set; }
+        private string Token { get; set; }
+        private static string BaseUrl { get; set; }
+        private static RestClient client { get; set; }
+        private static string session_id { get; set; }
 
-        public ApiClient(string baseUrl)
+        private static object locker = new { };
+
+        private static ApiClient? _instance;
+        public static ApiClient Instance
         {
-            BaseUrl = baseUrl;
-            client = new RestClient(BaseUrl);
+            get
+            {
+                if (string.IsNullOrWhiteSpace(BaseUrl))
+                {
+                    throw new Exception("You must call initialize first");
+                }
+
+                lock(locker)
+                {
+                    if(_instance == null)
+                    {
+                        _instance = new ApiClient();
+                    }
+
+                    return _instance;
+                }
+            }
         }
 
-        public async Task<bool> Init(string clientId, string clientSecret)
+        private ApiClient()
+        {
+            //BaseUrl = baseUrl;
+            //client = new RestClient(BaseUrl);
+        }
+
+        public static async Task Initialize(string baseUrl, string clientId, string clientSecret)
+        {
+            BaseUrl = baseUrl;
+
+            var options = new RestClientOptions(baseUrl)
+            {
+                ThrowOnAnyError = false,
+                ThrowOnDeserializationError = false,
+                FailOnDeserializationError= false
+
+            };
+            client = new RestClient(options);            
+
+            session_id = Guid.NewGuid().ToString();
+            ClientId = clientId;
+            ClientSecret = clientSecret;
+            await Instance.GetOAuth2TokenAsync(BaseUrl, ClientId, ClientSecret);
+        }
+
+       /* public async Task<bool> Init(string clientId, string clientSecret)
         {
             session_id = Guid.NewGuid().ToString();
             ClientId = clientId;
             ClientSecret = clientSecret;
-            Token = await GetOAuth2TokenAsync(BaseUrl, ClientId, ClientSecret);
+            //Token = await GetOAuth2TokenAsync(BaseUrl, ClientId, ClientSecret);
             return (Token != null);
-        }
+        }*/
 
-        public async Task<string> GetOAuth2TokenAsync(string _baseUrl, string _clientId, string _clientSecret)
+        private async Task GetOAuth2TokenAsync(string _baseUrl, string _clientId, string _clientSecret)
         {
             string result = null;
             try
             {
                 var client = new RestClient(_baseUrl);
-
                 var request = new RestRequest("oauth/token").AddParameter("grant_type", "client_credentials");
                 request.AddParameter("client_id", _clientId);
                 request.AddParameter("client_secret", _clientSecret);
 
-                TokenResponse response = await client.PostAsync<TokenResponse>(request);
+                var response = await client.PostAsync(request);
                 if (response.IsSuccessStatusCode && response.Content != null)
-                    result = $"{response.TokenType} {response!.AccessToken}";
+                {
+                    var token = JsonConvert.DeserializeObject<TokenResponse>(response.Content);
+
+                    if(token == null)
+                    {
+                        return;
+                    }
+
+                    result = $"{token.token_type} {token!.access_token}";
+
+                    Token = result;
+                }
+                    
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex.Message);
+                throw;
             }
 
-            return result;
+            return;
         }
 
-        public async Task<AuthorizationResponse> Authorize(AuthorizationRequest AuthorizationRequest)
+        public async Task<AuthorizationResponse> AuthorizePayment(AuthorizationRequest AuthorizationRequest)
         {
-            try
-            {
-                var request = new RestRequest("v6/Authorize");
-                SetHeader(request);
+            var request = new RestRequest("v6/Authorize") { Method = Method.Post };
+            SetHeader(request);
 
-                request.AddJsonBody(AuthorizationRequest);
+            request.AddJsonBody(AuthorizationRequest);
 
-                RestResponse response = await client.PostAsync(request);
-                if (response.IsSuccessStatusCode && response.Content != null)
-                {
-                    var rest = JsonConvert.DeserializeObject<AuthorizationResponse>(response.Content);
-                    return rest;
-                }
-                else
-                {
-                    Console.WriteLine(response.Content);
-                }
-            }
-            catch (Exception ex)
+            RestResponse response = await client.ExecuteAsync(request);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
-                Console.WriteLine(ex.Message);
+                await Instance.GetOAuth2TokenAsync(BaseUrl, ClientId, ClientSecret);
+                return await AuthorizePayment(AuthorizationRequest);
             }
-            return null;
+
+            if (response.IsSuccessStatusCode && response.Content != null)
+            {
+                var rest = JsonConvert.DeserializeObject<AuthorizationResponse>(response.Content);
+                return rest;
+            }
+            else
+            {
+                Console.WriteLine(response.Content);
+                throw new Exception(response.Content);
+            }
         }
 
-        public async Task<AuthorizationResponse> AuthorizeToken(AuthorizationTokenRequest AuthorizationRequest)
+        public async Task<AuthorizationResponse> AuthorizePaymentToken(AuthorizationTokenRequest AuthorizationRequest)
         {
-            try
-            {
-                var request = new RestRequest("v6/AuthorizeToken");
-                SetHeader(request);
+            var request = new RestRequest("v6/AuthorizeToken") { Method = Method.Post };
+            SetHeader(request);
 
-                request.AddJsonBody(AuthorizationRequest);
+            request.AddJsonBody(AuthorizationRequest);
 
-                RestResponse response = await client.PostAsync(request);
-                if (response.IsSuccessStatusCode && response.Content != null)
-                {
-                    var rest = JsonConvert.DeserializeObject<AuthorizationResponse>(response.Content);
-                    return rest;
-                }
-                else
-                {
-                    Console.WriteLine(response.Content);
-                }
-            }
-            catch (Exception ex)
+            RestResponse response = await client.ExecuteAsync(request);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
-                Console.WriteLine(ex.Message);
+                await Instance.GetOAuth2TokenAsync(BaseUrl, ClientId, ClientSecret);
+                return await AuthorizePaymentToken(AuthorizationRequest);
             }
-            return null;
+
+            if (response.IsSuccessStatusCode && response.Content != null)
+            {
+                var rest = JsonConvert.DeserializeObject<AuthorizationResponse>(response.Content);
+                return rest;
+            }
+            else
+            {
+                Console.WriteLine(response.Content);
+                throw new Exception(response.Content);
+            }
         }
 
         public async Task<List<CustomerAccount>> GetCustomerTokens(string CustomerID)
         {
-            try
-            {
-                var request = new RestRequest("Payment5/GetCustomerTokens");
-                SetHeader(request);
+            var request = new RestRequest("Payment5/GetCustomerTokens") { Method = Method.Get };
+            SetHeader(request);
 
-                request.AddParameter("CustomerID", CustomerID);
+            request.AddParameter("CustomerID", CustomerID);
 
-                RestResponse response = await client.GetAsync(request);
-                if (response.IsSuccessStatusCode && response.Content != null)
-                {
-                    var rest = JsonConvert.DeserializeObject<List<CustomerAccount>>(response.Content);
-                    return rest;
-                }
-                else
-                {
-                    Console.WriteLine(response.Content);
-                }
-            }
-            catch (Exception ex)
+            var response = await client.ExecuteAsync(request);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
-                Console.WriteLine(ex.Message);
+                await Instance.GetOAuth2TokenAsync(BaseUrl, ClientId, ClientSecret);
+                return await GetCustomerTokens(CustomerID);
             }
-            return null;
+
+            if (response.IsSuccessStatusCode && response.Content != null)
+            {
+                var rest = JsonConvert.DeserializeObject<List<CustomerAccount>>(response.Content);
+                return rest;
+            }
+            else
+            {
+                Console.WriteLine(response.Content);
+                throw new Exception(response.Content);
+            }
         }
 
         public async Task<BalanceResponse> GetBalance(BalanceRequest balanceRequest)
         {
-            try
-            {
-                var request = new RestRequest("Payment6/GetBalance");
-                SetHeader(request);
+            var request = new RestRequest("Payment6/GetBalance") { Method = Method.Post };
+            SetHeader(request);
 
-                request.AddJsonBody(balanceRequest);
+            request.AddJsonBody(balanceRequest);
 
-                RestResponse response = await client.PostAsync(request);
-                if (response.IsSuccessStatusCode && response.Content != null)
-                {
-                    var rest = JsonConvert.DeserializeObject<BalanceResponse>(response.Content);
-                    return rest;
-                }
-                else
-                {
-                    Console.WriteLine(response.Content);
-                }
-            }
-            catch (Exception ex)
+            RestResponse response = await client.ExecuteAsync(request);
+
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
-                Console.WriteLine(ex.Message);
+                await Instance.GetOAuth2TokenAsync(BaseUrl, ClientId, ClientSecret);
+                return await GetBalance(balanceRequest);
             }
-            return null;
+
+            if (response.IsSuccessStatusCode && response.Content != null)
+            {
+                var rest = JsonConvert.DeserializeObject<BalanceResponse>(response.Content);
+                return rest;
+            }
+            else
+            {
+                Console.WriteLine(response.Content);
+                throw new Exception(response.Content);
+            }
+        }
+
+        public async Task<bool> IsValidCard(string cardNumber)
+        {
+            var request = new RestRequest("Payment5/IsValidCard?CardNumber=" + cardNumber) { Method = Method.Get };
+
+            SetHeader(request);
+
+            RestResponse response = await client.ExecuteAsync(request);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                await Instance.GetOAuth2TokenAsync(BaseUrl, ClientId, ClientSecret);
+                return await IsValidCard(cardNumber);
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new Exception("Card number is invalid");
+            }
+
+            var result = response.Content;
+
+            return !string.IsNullOrWhiteSpace(result) && result.ToLower().Trim() == "true";
+        }
+
+        public async Task<bool> IsValidRoutingNumber(string routingNumber)
+        {
+            var request = new RestRequest("Payment5/IsValidRoutingNumber?RoutingNumber=" + routingNumber) { Method = Method.Get };
+
+            SetHeader(request);
+
+            RestResponse response = await client.ExecuteAsync(request);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                await Instance.GetOAuth2TokenAsync(BaseUrl, ClientId, ClientSecret);
+                return await IsValidRoutingNumber(routingNumber);
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new Exception("Routing number is invalid");
+            }
+
+            var result = response.Content;
+
+            return !string.IsNullOrWhiteSpace(result) && result.ToLower().Trim() == "true";
+        }
+
+        public async Task<bool> DeleteCustomerCard(DeleteTokenRequest deleteRequest)
+        {
+            var request = new RestRequest("Payment5/DeleteCustomerToken"){ Method = Method.Post };
+
+            SetHeader(request);
+
+            request.AddJsonBody(deleteRequest);
+
+            RestResponse response = await client.ExecuteAsync(request);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                await Instance.GetOAuth2TokenAsync(BaseUrl, ClientId, ClientSecret);
+                return await DeleteCustomerCard(deleteRequest);
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new Exception(response.Content);
+            }
+
+            return true;
         }
 
         private void SetHeader(RestRequest request)

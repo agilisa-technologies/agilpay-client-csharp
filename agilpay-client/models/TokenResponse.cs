@@ -5,8 +5,8 @@ namespace agilpay.models
     record TokenResponse
     {
         [JsonPropertyName("token_type")]
-        public string TokenType { get; init; }
+        public string token_type { get; init; }
         [JsonPropertyName("access_token")]
-        public string AccessToken { get; init; }
+        public string access_token { get; init; }
     }
 }
