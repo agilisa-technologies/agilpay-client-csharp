@@ -8,5 +8,7 @@ namespace agilpay.models
         public string token_type { get; init; }
         [JsonPropertyName("access_token")]
         public string access_token { get; init; }
+
+        public long expires_in { get; set; }
     }
 }
