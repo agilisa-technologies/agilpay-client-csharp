@@ -1,11 +1,12 @@
 # agilpay-client-csharp
-Agilpay client class c#
+
 
 # Client class for Agilpay REST API service  
+Agilpay client class c#
 
-The Web Services Module consists of web services accessible via HTTP / HTTPS, which can be used by external channels or systems to perform operations on the System on the Gateway server.
+Agilpay REST API can be accessed through standard protocols such as REST. 
+This library can be used by applications to perform operations on the Agilpay Gateway server using C# code
 
-Web Services can be accessed through standard protocols, such as REST
 Endpoint authentication uses OAUTH 2.0 standard
 
 This repository includes 2 projects
@@ -16,9 +17,11 @@ This repository includes 2 projects
 # Available endpoints
 
 * OAuth Autentication (init)
-* Balance
-* Authorize
-* AuthorizeToken
+* Authorize Payment 
+* Authorize Payment by Token
+* Register Token
+* Customer Wallet Management
+* Invoice Balance
 
 # Initializing library
 
@@ -30,7 +33,6 @@ The environment URL must be supplied on class initialization
 _url = "https://sandbox-webapi.agilpay.net/";
 var client = new agilpay.ApiClient(_url);
 ```
-
 > URL address could change depending on configuration. Please check with your account representative
 
 For authentication, this information must be provided to the Init method, the identity provider will issue a token to the requesting application.
