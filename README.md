@@ -49,3 +49,26 @@ if (result){
 }
 ```
 
+# Authorizing Payment
+```
+var authorizationRequest = new AuthorizationRequest()
+                {
+                    MerchantKey = "TEST-001",
+                    AccountNumber = "4242424242424242",
+                    ExpirationMonth = "01",
+                    ExpirationYear = "29",
+                    CustomerName = "Test User",
+                    CustomerID = "USER-123456",
+                    AccountType = agilpay.AccountType.Credit_Debit,
+                    CustomerEmail = "testuser@gmail.com",
+                    ZipCode = "33167",
+                    Amount = 22.56,
+                    Currency = "840",
+                    Tax = "0",
+                    Invoice = "123465465",
+                    Transaction_Detail = "payment information detail"
+                };
+
+                Console.WriteLine("Requesting authorization...");
+                var resultPayment = await agilpay.ApiClient.Instance.AuthorizePayment(authorizationRequest);
+```
