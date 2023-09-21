@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace agilpay.models
+namespace agilpay.client.models
 {
 
     public class BalanceResponse

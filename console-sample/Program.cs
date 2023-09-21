@@ -1,4 +1,6 @@
-﻿using agilpay.models;
+﻿
+using agilpay;
+using agilpay.client.models;
 using Newtonsoft.Json;
 using System;
 using System.Threading.Tasks;
@@ -20,8 +22,9 @@ namespace TestTransaction
                 var _url = Console.ReadLine();
                 _url = string.IsNullOrEmpty(_url) ? "https://sandbox-webapi.agilpay.net/" : _url;
 
+                
 
-                ///var client = new agilpay.ApiClient(_url);
+                var client = new ApiClient(_url);
 
                 // OAUTH 2.0
                 bool result = false;
@@ -35,12 +38,12 @@ namespace TestTransaction
                     Console.Write("Secret [Dynapay]:");
                     var secret = Console.ReadLine();
                     secret = string.IsNullOrEmpty(secret) ? "Dynapay" : secret;
-                    //result = await client.Init(client_id, secret);
+                    await client.Init(client_id, secret);
 
                     Console.ForegroundColor = ConsoleColor.Green;
                     //Console.WriteLine("OAuth 2.0 token:\n" + client.Token);
 
-                    await agilpay.ApiClient.Initialize(_url, client_id, secret);
+                    //await ApiClient.Initialize(_url, client_id, secret);
                     break;
                 }
 
@@ -57,7 +60,7 @@ namespace TestTransaction
                 var customer_id = Console.ReadLine();
                 customer_id = string.IsNullOrEmpty(customer_id) ? "123456" : customer_id;
 
-                var resultTokens = await agilpay.ApiClient.Instance.GetCustomerTokens(customer_id);
+                var resultTokens = await client.GetCustomerTokens(customer_id);
                 if (resultTokens != null)
                 {
                     foreach (var item in resultTokens)
@@ -77,7 +80,7 @@ namespace TestTransaction
                     CustomerId = customer_id,
                 };
 
-                var resultBalance = await agilpay.ApiClient.Instance.GetBalance(balanceRequest);
+                var resultBalance = await client.GetBalance(balanceRequest);
                 Console.ForegroundColor = ConsoleColor.Green;
                 Console.WriteLine("Balance Result:\n" + JsonConvert.SerializeObject(resultBalance, Formatting.Indented));
 
@@ -100,7 +103,7 @@ namespace TestTransaction
                     ExpirationYear = "29",
                     CustomerName = "Test User",
                     CustomerID = customer_id,
-                    AccountType = agilpay.AccountType.Credit_Debit,
+                    AccountType = AccountType.Credit_Debit,
                     CustomerEmail = "testuser@gmail.com",
                     ZipCode = "33167",
                     Amount = amount,
@@ -111,7 +114,7 @@ namespace TestTransaction
                 };
 
                 Console.WriteLine("Requesting authorization...");
-                var resultPayment = await agilpay.ApiClient.Instance.AuthorizePayment(authorizationRequest);
+                var resultPayment = await client.AuthorizePayment(authorizationRequest);
                 Console.ForegroundColor = ConsoleColor.Green;
                 Console.WriteLine("Authorization Result:\n" + JsonConvert.SerializeObject(resultPayment, Formatting.Indented));
 

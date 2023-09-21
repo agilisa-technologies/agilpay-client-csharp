@@ -1,4 +1,4 @@
-﻿namespace agilpay.models
+﻿namespace agilpay.client.models
 {
     public class Invoice
     {

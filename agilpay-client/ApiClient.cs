@@ -1,71 +1,48 @@
-﻿using agilpay.models;
-using agilpay.Util;
+﻿
+using agilpay.client.models;
+using agilpay.models;
 using Newtonsoft.Json;
 using RestSharp;
+using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Http;
 using System.Text;
+using System.Threading.Tasks;
 using System.Web;
 
 namespace agilpay
 {
     public class ApiClient
     {
-        private static string ClientId { get; set; }
-        private static string ClientSecret { get; set; }
+        private string ClientId { get; set; }
+        private string ClientSecret { get; set; }
         private string Token { get; set; }
         private DateTime TokenExpireTime { get; set; }
-        private static string BaseUrl { get; set; }
-        private static RestClient client { get; set; }
-        private static string session_id { get; set; }
+        private string BaseUrl { get; set; }
+        private RestClient client { get; set; }
+        private string session_id { get; set; }
 
-        private static object locker = new { };
-
-        private static ApiClient? _instance;
-        public static ApiClient Instance
-        {
-            get
-            {
-                if (string.IsNullOrWhiteSpace(BaseUrl))
-                {
-                    throw new Exception("You must call initialize first");
-                }
-
-                lock(locker)
-                {
-                    if(_instance == null)
-                    {
-                        _instance = new ApiClient();
-                    }
-
-                    return _instance;
-                }
-            }
-        }
-
-        private ApiClient()
-        {
-            //BaseUrl = baseUrl;
-            //client = new RestClient(BaseUrl);
-        }
-
-        public static async Task Initialize(string baseUrl, string clientId, string clientSecret)
+        public ApiClient(string baseUrl)
         {
             BaseUrl = baseUrl;
-
             var options = new RestClientOptions(baseUrl)
             {
                 ThrowOnAnyError = false,
                 ThrowOnDeserializationError = false,
-                FailOnDeserializationError= false
+                FailOnDeserializationError = false,
+                BaseUrl = new Uri(baseUrl)
 
             };
-            client = new RestClient(options);            
+            client = new RestClient(options);
+        }
 
+        public async Task Init(string clientId, string clientSecret)
+        {
             session_id = Guid.NewGuid().ToString();
             ClientId = clientId;
             ClientSecret = clientSecret;
-            await Instance.GetOAuth2TokenAsync(BaseUrl, ClientId, ClientSecret);
+            await GetOAuth2TokenAsync(BaseUrl, ClientId, ClientSecret);
         }
 
        /* public async Task<bool> Init(string clientId, string clientSecret)
@@ -97,7 +74,7 @@ namespace agilpay
                         return;
                     }
 
-                    result = $"{token.token_type} {token!.access_token}";
+                    result = $"{token.token_type} {token.access_token}";
 
                     Token = result;
                     TokenExpireTime = DateTime.UtcNow.AddSeconds(token.expires_in);

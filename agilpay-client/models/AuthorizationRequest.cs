@@ -1,4 +1,6 @@
-﻿namespace agilpay.models
+﻿using System;
+
+namespace agilpay.client.models
 {
     public class AuthorizationRequest
     {
@@ -6,7 +8,7 @@
         public AccountType AccountType { get; set; }
         public string AccountNumber { get; set; }
         public string RoutingNumber { get; set; }
-        public DateTime? EffectiveDate { get; set; }
+        public DateTime EffectiveDate { get; set; }
         public bool IsDefault { get; set; }
         public string ExpirationMonth { get; set; }
         public string ExpirationYear { get; set; }
@@ -26,5 +28,7 @@
         public bool HoldFunds { get; set; }
         public string ExtData { get; set; }
 
+        public bool SaveWallet { get; set; }
+        public bool ForceDuplicate { get; set; }
     }
 }

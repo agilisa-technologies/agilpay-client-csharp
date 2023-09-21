@@ -1,4 +1,4 @@
-﻿namespace agilpay
+﻿namespace agilpay.client.models
 {
     public enum AccountType
     {

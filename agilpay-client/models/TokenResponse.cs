@@ -1,13 +1,13 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace agilpay.models
+namespace agilpay.client.models
 {
-    record TokenResponse
+    public class TokenResponse
     {
         [JsonPropertyName("token_type")]
-        public string token_type { get; init; }
+        public string token_type { get; set; }
         [JsonPropertyName("access_token")]
-        public string access_token { get; init; }
+        public string access_token { get; set; }
 
         public long expires_in { get; set; }
     }

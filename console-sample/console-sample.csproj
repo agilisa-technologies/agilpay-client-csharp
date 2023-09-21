@@ -6,11 +6,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="RestSharp" Version="109.0.1" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\agilpay-client\agilpay-client.csproj" />
   </ItemGroup>
 

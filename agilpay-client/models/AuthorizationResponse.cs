@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace agilpay.models
+namespace agilpay.client.models
 {
     public class AuthorizationResponse
     {
@@ -23,7 +23,7 @@ namespace agilpay.models
         public string HostDate { get; set; }
         public string HostTime { get; set; }
         public string Reference_Code { get; set; }
-        public decimal? Amount { get; set; }
-        public short? Currency { get; set; }
+        public decimal Amount { get; set; }
+        public short Currency { get; set; }
     }
 }
