@@ -11,13 +11,13 @@ namespace agilpay
 {
     public class ApiClient
     {
-        private static string ClientId { get; set; }
-        private static string ClientSecret { get; set; }
+        private string ClientId { get; set; }
+        private string ClientSecret { get; set; }
         private string Token { get; set; }
         private DateTime TokenExpireTime { get; set; }
-        private static string BaseUrl { get; set; }
-        private static RestClient client { get; set; }
-        private static string session_id { get; set; }
+        private string BaseUrl { get; set; }
+        private RestClient client { get; set; }
+        private string session_id { get; set; }
 
         private static object locker = new { };
 
@@ -26,7 +26,7 @@ namespace agilpay
         {
             get
             {
-                if (string.IsNullOrWhiteSpace(BaseUrl))
+                if (string.IsNullOrWhiteSpace(_instance?.BaseUrl))
                 {
                     throw new Exception("You must call initialize first");
                 }
@@ -43,7 +43,7 @@ namespace agilpay
             }
         }
 
-        private ApiClient()
+        public ApiClient()
         {
             //BaseUrl = baseUrl;
             //client = new RestClient(BaseUrl);
@@ -51,7 +51,7 @@ namespace agilpay
 
         public static async Task Initialize(string baseUrl, string clientId, string clientSecret)
         {
-            BaseUrl = baseUrl;
+            Instance.BaseUrl = baseUrl;
 
             var options = new RestClientOptions(baseUrl)
             {
@@ -60,32 +60,31 @@ namespace agilpay
                 FailOnDeserializationError= false
 
             };
-            client = new RestClient(options);            
 
-            session_id = Guid.NewGuid().ToString();
-            ClientId = clientId;
-            ClientSecret = clientSecret;
-            await Instance.GetOAuth2TokenAsync(BaseUrl, ClientId, ClientSecret);
+            Instance.ClientId = clientId;
+            Instance.ClientSecret = clientSecret;
+            await Instance.GetOAuth2TokenAsync();
         }
 
-       /* public async Task<bool> Init(string clientId, string clientSecret)
+        public async Task<bool> Init(string baseUrl, string clientId, string clientSecret)
         {
+            BaseUrl = baseUrl;
             session_id = Guid.NewGuid().ToString();
             ClientId = clientId;
             ClientSecret = clientSecret;
-            //Token = await GetOAuth2TokenAsync(BaseUrl, ClientId, ClientSecret);
+            await GetOAuth2TokenAsync();
             return (Token != null);
-        }*/
+        }
 
-        private async Task GetOAuth2TokenAsync(string _baseUrl, string _clientId, string _clientSecret)
+        private async Task GetOAuth2TokenAsync()
         {
             string result = null;
             try
             {
-                var client = new RestClient(_baseUrl);
+                client = new RestClient(BaseUrl);
                 var request = new RestRequest("oauth/token").AddParameter("grant_type", "client_credentials");
-                request.AddParameter("client_id", _clientId);
-                request.AddParameter("client_secret", _clientSecret);
+                request.AddParameter("client_id", ClientId);
+                request.AddParameter("client_secret", ClientSecret);
 
                 var response = await client.PostAsync(request);
                 if (response.IsSuccessStatusCode && response.Content != null)
@@ -122,7 +121,7 @@ namespace agilpay
 
             if(DateTime.Compare(TokenExpireTime, DateTime.UtcNow) < 0)
             {
-                await GetOAuth2TokenAsync(BaseUrl, ClientId, ClientSecret);
+                await GetOAuth2TokenAsync();
             }
         }
 
