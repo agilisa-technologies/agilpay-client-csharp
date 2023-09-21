@@ -6,9 +6,9 @@ namespace agilpay.client.models
     {
         public string MerchantKey { get; set; }
         public string AccountToken { get; set; }
-        public string Amount { get; set; }
+        public double Amount { get; set; }
         public string Currency { get; set; }
-        public string Tax { get; set; }
+        public double Tax { get; set; }
         public string Invoice { get; set; }
         public string Transaction_Detail { get; set; }
         public bool HoldFunds { get; set; }
