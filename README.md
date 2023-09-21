@@ -34,6 +34,7 @@ This repository includes 2 projects
 * RecurringScheduleGet
 * RecurringScheduleChangeStatus
 * RecurringScheduleUpdate
+* RegisterToken
 
 # Initializing library
 

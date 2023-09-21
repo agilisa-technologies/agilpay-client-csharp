@@ -23,6 +23,42 @@ namespace agilpay
         private RestClient client { get; set; }
         private string session_id { get; set; }
 
+
+        private static readonly object locker = new object();
+        private static ApiClient _instance;
+        
+        public static ApiClient Instance
+        {
+            get
+            {
+                lock (locker)
+                {
+                    if(_instance == null)
+                    {
+                        throw new Exception("You must call InitSingleton first");
+                    }
+
+                    return _instance;
+                }
+            }
+        }
+
+        public static async Task<ApiClient> InitSingleton(string baseUrl, string clientId, string clientSecret)
+        {
+            lock (locker)
+            {
+                if(_instance != null)
+                {
+                    return _instance;
+                }
+                _instance = new ApiClient(baseUrl);
+            }
+            await _instance.Init(clientId, clientSecret);
+
+            return _instance;
+        }
+
+
         public ApiClient(string baseUrl)
         {
             BaseUrl = baseUrl;
@@ -262,6 +298,26 @@ namespace agilpay
             }
 
             return true;
+        }
+
+        public async Task<CustomerAccount> RegisterToken(RegisterTokenRequest args)
+        {
+            var request = new RestRequest("v6/RegisterToken") { Method = Method.Post };
+
+            SetHeader(request);
+
+            request.AddJsonBody(args);
+
+            await CheckTokenExpiration();
+
+            RestResponse response = await client.ExecuteAsync(request);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new Exception(response.Content);
+            }
+
+            return JsonConvert.DeserializeObject<CustomerAccount>(response.Content);
         }
 
         public async Task<string> CloseBatchResumen(string MerchantKey)
