@@ -12,6 +12,7 @@ Endpoint authentication uses OAUTH 2.0 standard
 This repository includes 2 projects
 * agilpay.client class: sample implementation to connect to Agilpay REST API
 * console-sample: console application to test agilpay.client class
+* Available on NuGet: https://www.nuget.org/packages/AgilPay.SDK.Xamarin/
 
 
 # Available endpoints
