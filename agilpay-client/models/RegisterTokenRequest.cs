@@ -17,6 +17,8 @@ namespace agilpay.models
         public bool IsDefault { get; set; }
         public string ZipCode { get; set; }
 
+        public string CVV { get; set; }
+
         public string RoutingNumber { get; set; }
     }
 }

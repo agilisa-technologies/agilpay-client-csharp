@@ -91,6 +91,8 @@ namespace TestTransaction
                 var amount = Console.ReadLine();
                 amount = string.IsNullOrEmpty(amount) ? "1.02" : amount;
 
+                double.TryParse(amount, out double amountDouble);
+
                 Console.Write("\nPayment Account [4242-4242-4242-4242]:");
                 var card = Console.ReadLine();
                 card = string.IsNullOrEmpty(card) ? "4242424242424242" : card;
@@ -106,9 +108,9 @@ namespace TestTransaction
                     AccountType = AccountType.Credit_Debit,
                     CustomerEmail = "testuser@gmail.com",
                     ZipCode = "33167",
-                    Amount = amount,
+                    Amount = amountDouble,
                     Currency = "840",
-                    Tax = "0",
+                    Tax = 0.0,
                     Invoice = "123465465",
                     Transaction_Detail = "payment information detail"
                 };
