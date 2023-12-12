@@ -1,4 +1,5 @@
 ﻿
+using Agilisa.BackendApi.Client;
 using agilpay;
 using agilpay.client.models;
 using Newtonsoft.Json;
@@ -116,16 +117,56 @@ namespace TestTransaction
                 };
 
                 Console.WriteLine("Requesting authorization...");
+               
                 var resultPayment = await client.AuthorizePayment(authorizationRequest);
                 Console.ForegroundColor = ConsoleColor.Green;
                 Console.WriteLine("Authorization Result:\n" + JsonConvert.SerializeObject(resultPayment, Formatting.Indented));
 
                 Console.WriteLine("Press any key...");
                 Console.ReadLine();
-            }catch(Exception e)
+
+
+
+                var authRequest = new AuthorizationRequest()
+                {
+                    MerchantKey = "TEST-001",// chanel.Merchant_Key,
+                    AccountNumber = "4016414912139323",
+                    ExpirationMonth = "06",
+                    ExpirationYear = "2026",
+                    CustomerName = "GEORDANO ALCANTARA",
+                    CustomerID = "16161616",
+                    CustomerEmail = "galcantara@agilisa.com",
+                    CustomerAddress = "los mina",
+                    AccountType = (AccountType)1,
+                    SaveWallet = false,
+                    ZipCode = "123456",
+                    Amount = 12,
+                    Currency = "840",
+                    Tax = 0,
+                    Invoice = "0926378465",
+                    Transaction_Detail = "Test",
+                    CVV = "123",
+                    ExtData = "{\"ConfirmationSms\":\"809669-9587\",\"ConfirmationMail\":\"galcantara@agilisa.com\",\"AmountPayment\":0.0,\"Account\":{\"Id\":\"16161616\",\"Number\":\"16161616\",\"Address\":\"\",\"AmountDue\":0.0,\"AmountDueMax\":0.0,\"AmountDueMin\":0.0,\"AmountPayment\":12.0,\"Name\":\"GAM Alcan\",\"EmailConfirmation\":\"galcantara@agilisa.com\",\"SMSConfirmation\":\"809-669-9587\",\"PaymentMethods\":[{\"Id\":0,\"AccountId\":null,\"IsRecurring\":null,\"AccountToke\":\"\",\"IsCreditCard\":true,\"RoutingNumber\":\"\",\"CustomerName\":null,\"AccountType\":\"\",\"JointName\":\"\",\"AccountNumber\":\"\",\"Nickname\":\"GEORDANO ALCANTARA\",\"IsPrimary\":false,\"CreditCardNumber\":\"4016414912139323\",\"CreditCardName\":null,\"ExpirationDate\":\"06/2026\",\"Cvv\":\"123\",\"ZipCode\":\"123456\",\"SaveWallet\":false,\"AmountPayment\":12.0,\"Selected\":false,\"CvvEithoutMask\":null,\"Cardexpired\":false}],\"Owner\":\"\",\"Description\":\"\",\"ApartmentNumber\":\"\",\"ManualPayment\":\"\",\"Reference1\":\"\",\"Reference2\":\"\",\"Reference3\":\"\",\"IdCustomer\":null,\"FirstName\":\"GAM\",\"MiddleName\":\"\",\"LastName\":\"Alcan\",\"PhoneNumber\":\"809-669-9587\",\"EmailAddress\":\"galcantara@agilisa.com\",\"ServiceAddress\":\"esa misma\",\"MailingAddress\":\"esa misma\",\"Json\":\"\",\"InvoiceNumber\":\"0926378465\",\"Additional\":{\"ExtData\":null}},\"Accounts\":[{\"Id\":\"16161616\",\"Number\":\"16161616\",\"Address\":\"\",\"AmountDue\":0.0,\"AmountDueMax\":0.0,\"AmountDueMin\":0.0,\"AmountPayment\":12.0,\"Name\":\"GAM Alcan\",\"EmailConfirmation\":\"galcantara@agilisa.com\",\"SMSConfirmation\":\"809-669-9587\",\"PaymentMethods\":[{\"Id\":0,\"AccountId\":null,\"IsRecurring\":null,\"AccountToke\":\"\",\"IsCreditCard\":true,\"RoutingNumber\":\"\",\"CustomerName\":null,\"AccountType\":\"\",\"JointName\":\"\",\"AccountNumber\":\"\",\"Nickname\":\"GEORDANO ALCANTARA\",\"IsPrimary\":false,\"CreditCardNumber\":\"4016414912139323\",\"CreditCardName\":null,\"ExpirationDate\":\"06/2026\",\"Cvv\":\"123\",\"ZipCode\":\"123456\",\"SaveWallet\":false,\"AmountPayment\":12.0,\"Selected\":false,\"CvvEithoutMask\":null,\"Cardexpired\":false}],\"Owner\":\"\",\"Description\":\"\",\"ApartmentNumber\":\"\",\"ManualPayment\":\"\",\"Reference1\":\"\",\"Reference2\":\"\",\"Reference3\":\"\",\"IdCustomer\":null,\"FirstName\":\"GAM\",\"MiddleName\":\"\",\"LastName\":\"Alcan\",\"PhoneNumber\":\"809-669-9587\",\"EmailAddress\":\"galcantara@agilisa.com\",\"ServiceAddress\":\"esa misma\",\"MailingAddress\":\"esa misma\",\"Json\":\"\",\"InvoiceNumber\":\"0926378465\",\"Additional\":{\"ExtData\":null}}],\"PaymentMethods\":[{\"Id\":0,\"AccountId\":null,\"IsRecurring\":null,\"AccountToke\":\"\",\"IsCreditCard\":true,\"RoutingNumber\":\"\",\"CustomerName\":null,\"AccountType\":\"\",\"JointName\":\"\",\"AccountNumber\":\"\",\"Nickname\":\"GEORDANO ALCANTARA\",\"IsPrimary\":false,\"CreditCardNumber\":\"4016414912139323\",\"CreditCardName\":null,\"ExpirationDate\":\"06/2026\",\"Cvv\":\"123\",\"ZipCode\":\"123456\",\"SaveWallet\":false,\"AmountPayment\":12.0,\"Selected\":false,\"CvvEithoutMask\":null,\"Cardexpired\":false}],\"Json\":\"\",\"Description\":\"\",\"ApartmentNumber\":\"\",\"Owner\":\"\",\"Service\":\"S-CSM|MULTIPLE SERVICE CORP|Customer Number|5.0|5000.0|False|^[0-9]{5,22}$|5 - 22 alphanumeric characters\",\"JsonManualPay\":\"\",\"User\":\"dcortes@agilisa.com\",\"Agreement\":null,\"RoutingNumber\":null,\"ZipCode\":null,\"Force\":false,\"CVV\":\"123\",\"HoldFund\":false,\"RefundTrancBtn\":false}",
+                    ForceDuplicate = true,
+                    HoldFunds = false,
+                    EffectiveDate = DateTime.Now//"2023-11-14"
+
+                };
+
+                var resu = await client.AuthorizePayment(authRequest);
+
+                Console.Write(resu);
+
+            }
+            catch(Exception e)
             {
                 Console.Write(e.Message);
             }
+
+
+
+
+
         }
 
 

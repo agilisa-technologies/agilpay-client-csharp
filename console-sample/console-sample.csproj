@@ -6,7 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\agilpay-client\agilpay-client.csproj" />
+    <PackageReference Include="AgilPay.Client" Version="1.0.6" />
   </ItemGroup>
 
 </Project>

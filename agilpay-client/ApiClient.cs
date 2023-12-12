@@ -95,13 +95,41 @@ namespace agilpay
             string result = null;
             try
             {
-                var client = new RestClient(_baseUrl);
-                var request = new RestRequest("oauth/token").AddParameter("grant_type", "client_credentials");
+
+                var client = new HttpClient() { BaseAddress = new Uri(_baseUrl) };
+
+                /*var request = new RestRequest("oauth/token").AddParameter("grant_type", "client_credentials");
                 request.AddParameter("client_id", _clientId);
                 request.AddParameter("client_secret", _clientSecret);
+                */
 
-                var response = await client.PostAsync(request);
-                if (response.IsSuccessStatusCode && response.Content != null)
+                Dictionary<string, string> args = new Dictionary<string, string>
+                {
+                    { "grant_type", "client_credentials" },
+                    { "client_id", _clientId },
+                    { "client_secret", _clientSecret }
+                };
+
+
+                var response = await client.PostAsync("oauth/token", new FormUrlEncodedContent(args));
+
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new Exception(await response.Content.ReadAsStringAsync());
+                }
+
+                var token = JsonConvert.DeserializeObject<TokenResponse>(await response.Content.ReadAsStringAsync());
+
+                if(token == null)
+                {
+                    throw new Exception("Cannot get Auth token at this time, please try later");
+                }
+                result = $"{token.token_type} {token.access_token}";
+                Token = result;
+                TokenExpireTime = DateTime.UtcNow.AddSeconds(token.expires_in);
+
+                /*if (response.IsSuccessStatusCode && response.Content != null)
                 {
                     var token = JsonConvert.DeserializeObject<TokenResponse>(response.Content);
 
@@ -114,13 +142,12 @@ namespace agilpay
 
                     Token = result;
                     TokenExpireTime = DateTime.UtcNow.AddSeconds(token.expires_in);
-                }
+                }*/
                     
-            }
-            catch (Exception ex)
+            }catch (Exception ex)
             {
                 Console.WriteLine(ex.Message);
-                throw;
+                throw ex;
             }
 
             return;
@@ -524,6 +551,66 @@ namespace agilpay
             }
 
             return JsonConvert.DeserializeObject<RecurringScheduleAddResponse>(response.Content);
+        }
+
+        public async Task<Transaction> Refund(AuthorizationRequest args)
+        {
+            var request = new RestRequest("Payment6/Refund") { Method = Method.Post };
+
+            SetHeader(request);
+
+            request.AddJsonBody(args);
+
+            await CheckTokenExpiration();
+
+            RestResponse response = await client.ExecuteAsync(request);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new Exception(response.Content);
+            }
+
+            return JsonConvert.DeserializeObject<Transaction>(response.Content);
+        }
+
+        public async Task<Transaction> RefundToken(AuthorizationTokenRequest args)
+        {
+            var request = new RestRequest("Payment6/RefundToken") { Method = Method.Post };
+
+            SetHeader(request);
+
+            request.AddJsonBody(args);
+
+            await CheckTokenExpiration();
+
+            RestResponse response = await client.ExecuteAsync(request);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new Exception(response.Content);
+            }
+
+            return JsonConvert.DeserializeObject<Transaction>(response.Content);
+        }
+
+        public async Task<Transaction> RefundByID(VoidByIdRequest args)
+        {
+            var request = new RestRequest("Payment6/RefundByID") { Method = Method.Post };
+
+            SetHeader(request);
+
+            request.AddJsonBody(args);
+
+            await CheckTokenExpiration();
+
+            RestResponse response = await client.ExecuteAsync(request);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new Exception(response.Content);
+            }
+
+            return JsonConvert.DeserializeObject<Transaction>(response.Content);
         }
 
         private void SetHeader(RestRequest request)
