@@ -1,4 +1,5 @@
-﻿using System;
+﻿using agilpay.models;
+using System;
 
 namespace agilpay.client.models
 {
@@ -30,5 +31,9 @@ namespace agilpay.client.models
 
         public bool SaveWallet { get; set; }
         public bool ForceDuplicate { get; set; }
+
+        public bool IsInstallments { get; set; }
+        public int InstallmentsCount { get; set; }
+        public ThreeDS ThreeDS { get; set; }
     }
 }

@@ -168,7 +168,7 @@ namespace agilpay
 
         public async Task<Transaction> AuthorizePayment(AuthorizationRequest AuthorizationRequest)
         {
-            var request = new RestRequest("v6/Authorize") { Method = Method.Post };
+            var request = new RestRequest("Payment6.1/Autorize") { Method = Method.Post };
             SetHeader(request);
 
             request.AddJsonBody(AuthorizationRequest);
