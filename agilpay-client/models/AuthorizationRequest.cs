@@ -6,7 +6,7 @@ namespace agilpay.client.models
     public class AuthorizationRequest
     {
         public string MerchantKey { get; set; }
-        public AccountType AccountType { get; set; }
+        public String AccountType { get; set; }
         public string AccountNumber { get; set; }
         public string RoutingNumber { get; set; }
         public DateTime EffectiveDate { get; set; }
@@ -19,6 +19,8 @@ namespace agilpay.client.models
         public string CustomerAddress { get; set; }
         public string CustomerCity { get; set; }
         public string CustomerState { get; set; }
+
+        public string CustomerPhone { get; set; }
         public string ZipCode { get; set; }
         public double Amount { get; set; }
         public string Currency { get; set; }

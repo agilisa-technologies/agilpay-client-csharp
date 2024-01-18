@@ -187,7 +187,12 @@ namespace agilpay
             else
             {
                 Console.WriteLine(response.Content);
-                throw new Exception(response.Content);
+                return new Transaction
+                {
+                    Message = response.Content,
+                    ResponseCode = "99",
+                    Status = "REJECTED"
+                };
             }
         }
 
@@ -211,7 +216,12 @@ namespace agilpay
             else
             {
                 Console.WriteLine(response.Content);
-                throw new Exception(response.Content);
+                return new Transaction
+                {
+                    ResponseCode = "99",
+                    Message = response.Content,
+                    Status = "REJECTED"
+                };
             }
         }
 
