@@ -8,7 +8,7 @@
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <PackageId>AgilPay.Client</PackageId>
     <Title>AgilPay Client for .Net</Title>
-    <Version>1.0.13</Version>
+    <Version>1.0.14</Version>
     <Authors>AgilisaTechnologies</Authors>
     <Description>AgilPay Client for .Net</Description>
     <Copyright>© Agilisa Technologies. All rights reserved.</Copyright>

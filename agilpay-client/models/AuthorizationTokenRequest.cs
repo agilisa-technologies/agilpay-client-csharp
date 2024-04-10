@@ -23,5 +23,6 @@ namespace agilpay.client.models
         public bool IsInstallments { get; set; }
         public int InstallmentsCount { get; set; }
 
+
     }
 }
