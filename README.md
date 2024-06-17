@@ -17,7 +17,6 @@ Client library available on NuGet: https://www.nuget.org/packages/AgilPay.Client
 
 Complete documentation can be found at: https://agilisa.atlassian.net/wiki/x/AYAN
 
-
 # Available endpoints
 
 * OAuth Autentication (init)
