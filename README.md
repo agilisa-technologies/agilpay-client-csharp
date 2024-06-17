@@ -46,8 +46,8 @@ The environment URL must be supplied on class initialization
 * for production environment: https://webapi.agilpay.net/ 
 
 ``` csharp
-_url = "https://sandbox-webapi.agilpay.net/";
-var client = new agilpay.ApiClient(_url);
+    _url = "https://sandbox-webapi.agilpay.net/";
+    var client = new agilpay.ApiClient(_url);
 ```
 > URL address could change depending on configuration. Please check with your account representative
 
@@ -56,12 +56,12 @@ For authentication, this information must be provided to the Init method, the id
 * client_secret: Password used to authenticate the token request
 
 ``` csharp
-await client.Init(client_id, secret);
+    await client.Init(client_id, secret);
 ```
 
 # Authorizing Payment
 ```
-var authorizationRequest = new AuthorizationRequest()
+    var authorizationRequest = new AuthorizationRequest()
                 {
                     MerchantKey = "TEST-001",
                     AccountNumber = "4242424242424242",
@@ -79,6 +79,6 @@ var authorizationRequest = new AuthorizationRequest()
                     Transaction_Detail = "payment information detail"
                 };
 
-                Console.WriteLine("Requesting authorization...");
-                var resultPayment = await client.AuthorizePayment(authorizationRequest);
+    Console.WriteLine("Requesting authorization...");
+    var resultPayment = await client.AuthorizePayment(authorizationRequest);
 ```
