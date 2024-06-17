@@ -5,9 +5,7 @@ using Newtonsoft.Json;
 using RestSharp;
 using System;
 using System.Collections.Generic;
-using System.Net;
 using System.Net.Http;
-using System.Text;
 using System.Threading.Tasks;
 using System.Web;
 
@@ -168,7 +166,7 @@ namespace agilpay
 
         public async Task<Transaction> AuthorizePayment(AuthorizationRequest AuthorizationRequest)
         {
-            var request = new RestRequest("Payment6.1/Autorize") { Method = Method.Post };
+            var request = new RestRequest("v6/Autorize") { Method = Method.Post };
             SetHeader(request);
 
             request.AddJsonBody(AuthorizationRequest);
