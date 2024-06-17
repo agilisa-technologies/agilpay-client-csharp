@@ -12,7 +12,10 @@ Endpoint authentication uses OAUTH 2.0 standard
 This repository includes 2 projects
 * agilpay.client class: sample implementation to connect to Agilpay REST API
 * console-sample: console application to test agilpay.client class
-* Available on NuGet: https://www.nuget.org/packages/AgilPay.Client/
+ 
+Client library available on NuGet: https://www.nuget.org/packages/AgilPay.Client/
+
+Complete documentation can be found at: https://agilisa.atlassian.net/wiki/x/AYAN
 
 
 # Available endpoints
@@ -40,8 +43,8 @@ This repository includes 2 projects
 # Initializing library
 
 The environment URL must be supplied on class initialization
-* for test environment: https://sandbox-webpay.agilpay.net/ 
-* for production environment: https://webpay.agilpay.net/ 
+* for test environment: https://sandbox-webapi.agilpay.net/ 
+* for production environment: https://webapi.agilpay.net/ 
 
 ``` csharp
 _url = "https://sandbox-webapi.agilpay.net/";
@@ -78,5 +81,5 @@ var authorizationRequest = new AuthorizationRequest()
                 };
 
                 Console.WriteLine("Requesting authorization...");
-                var resultPayment = await agilpay.ApiClient.Instance.AuthorizePayment(authorizationRequest);
+                var resultPayment = await client.AuthorizePayment(authorizationRequest);
 ```
