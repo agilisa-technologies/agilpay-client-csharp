@@ -8,7 +8,7 @@
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <PackageId>AgilPay.Client</PackageId>
     <Title>AgilPay Client for .Net</Title>
-    <Version>1.0.14</Version>
+    <Version>1.0.18</Version>
     <Authors>AgilisaTechnologies</Authors>
     <Description>AgilPay Client for .Net</Description>
     <Copyright>© Agilisa Technologies. All rights reserved.</Copyright>
@@ -25,7 +25,6 @@
 
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="RestSharp" Version="110.2.0" />
   </ItemGroup>
 
   <ItemGroup>
