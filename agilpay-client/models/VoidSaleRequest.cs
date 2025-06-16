@@ -12,5 +12,7 @@ namespace agilpay.client.models
         public string AuthNumber { get; set; }
         public string ReferenceCode { get; set; }
         public string AuditNumber { get; set; }
+
+        public string ExtData { get; set; }
     }
 }
