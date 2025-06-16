@@ -12,8 +12,10 @@ Endpoint authentication uses OAUTH 2.0 standard
 This repository includes 2 projects
 * agilpay.client class: sample implementation to connect to Agilpay REST API
 * console-sample: console application to test agilpay.client class
-* Available on NuGet: https://www.nuget.org/packages/AgilPay.Client/
+ 
+Client library available on NuGet: https://www.nuget.org/packages/AgilPay.Client/
 
+Complete documentation can be found at: https://agilisa.atlassian.net/wiki/x/AYAN
 
 # Available endpoints
 
@@ -40,12 +42,12 @@ This repository includes 2 projects
 # Initializing library
 
 The environment URL must be supplied on class initialization
-* for test environment: https://sandbox-webpay.agilpay.net/ 
-* for production environment: https://webpay.agilpay.net/ 
+* for test environment: https://sandbox-webapi.agilpay.net/ 
+* for production environment: https://webapi.agilpay.net/ 
 
 ``` csharp
-_url = "https://sandbox-webapi.agilpay.net/";
-var client = new agilpay.ApiClient(_url);
+    _url = "https://sandbox-webapi.agilpay.net/";
+    var client = new agilpay.ApiClient(_url);
 ```
 > URL address could change depending on configuration. Please check with your account representative
 
@@ -54,12 +56,12 @@ For authentication, this information must be provided to the Init method, the id
 * client_secret: Password used to authenticate the token request
 
 ``` csharp
-await client.Init(client_id, secret);
+    await client.Init(client_id, secret);
 ```
 
 # Authorizing Payment
 ```
-var authorizationRequest = new AuthorizationRequest()
+    var authorizationRequest = new AuthorizationRequest()
                 {
                     MerchantKey = "TEST-001",
                     AccountNumber = "4242424242424242",
@@ -67,7 +69,7 @@ var authorizationRequest = new AuthorizationRequest()
                     ExpirationYear = "29",
                     CustomerName = "Test User",
                     CustomerID = "USER-123456",
-                    AccountType = agilpay.AccountType.Credit_Debit,
+                    AccountType = AccountType.Credit_Debit,
                     CustomerEmail = "testuser@gmail.com",
                     ZipCode = "33167",
                     Amount = 22.56,
@@ -77,6 +79,6 @@ var authorizationRequest = new AuthorizationRequest()
                     Transaction_Detail = "payment information detail"
                 };
 
-                Console.WriteLine("Requesting authorization...");
-                var resultPayment = await agilpay.ApiClient.Instance.AuthorizePayment(authorizationRequest);
+    Console.WriteLine("Requesting authorization...");
+    var resultPayment = await client.AuthorizePayment(authorizationRequest);
 ```

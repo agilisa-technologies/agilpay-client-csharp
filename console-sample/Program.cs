@@ -10,6 +10,7 @@ namespace TestTransaction
     class Program
     {
 
+
         static async Task Main(string[] args)
         {
             try
@@ -24,29 +25,24 @@ namespace TestTransaction
 
                 var client = new ApiClient(_url);
                 // OAUTH 2.0
-                bool result = false;
-                while (!result)
-                {
-                    Console.ForegroundColor = ConsoleColor.White;
-                    Console.Write("Client_id [API-001]:");
-                    var client_id = Console.ReadLine();
-                    client_id = string.IsNullOrEmpty(client_id) ? "API-001" : client_id;
+                Console.ForegroundColor = ConsoleColor.White;
+                var client_id = GetInput("Client_id [API-001]:", "API-001");
+                var secret = GetInput("Secret [Dynapay]:", "Dynapay");
 
-                    Console.Write("Secret [Dynapay]:");
-                    var secret = Console.ReadLine();
-                    secret = string.IsNullOrEmpty(secret) ? "Dynapay" : secret;
-                    await client.Init(client_id, secret);
+                await client.Init(client_id, secret);
 
                     Console.ForegroundColor = ConsoleColor.Green;
                     break;
                 }
-                ///  Balance
+                // Authorize Payment
+                await AuthorizePayment(client, merchant_key, customer_id);
 
                 ///Console.ForegroundColor = ConsoleColor.White;
                 Console.Write("Merchant Key [TEST-001]:");
 
-                var merchant_key = Console.ReadLine();
-                merchant_key = string.IsNullOrEmpty(merchant_key) ? "TEST-001" : merchant_key;
+        private static async Task<string> GetCustomerTokens(ApiClient client)
+        {
+            var customer_id = GetInput("Customer Account [123456]:", "123456");
 
                 Console.Write("Customer Account [010957593]:");
                 var customer_id = Console.ReadLine();
@@ -107,8 +103,5 @@ namespace TestTransaction
 
 
         }
-
-
-
     }
 }

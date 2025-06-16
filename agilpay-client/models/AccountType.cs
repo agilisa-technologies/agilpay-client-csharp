@@ -1,9 +1,9 @@
 ﻿namespace agilpay.client.models
 {
-    public enum AccountType
+    public static class AccountType
     {
-        Credit_Debit = 1,
-        ACH_Checking = 2,
-        ACH_Savings = 3,
+        public const string Credit_Debit = "1";
+        public const string ACH_Checking = "2";
+        public const string ACH_Savings = "3";
     }
 }
