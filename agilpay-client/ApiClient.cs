@@ -651,7 +651,7 @@ namespace agilpay
             return JsonConvert.DeserializeObject<Transaction>(msg);
         }
 
-        public async Task<Transaction> RefundByID(RefundByIdRequest args)
+        public async Task<Transaction> RefundByID(VoidByIdRequest args)
         {
             //var request = new RestRequest("Payment6/RefundByID") { Method = Method.Post };
 
