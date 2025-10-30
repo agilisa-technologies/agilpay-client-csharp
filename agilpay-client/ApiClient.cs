@@ -1,5 +1,5 @@
-﻿using agilpay.client.models;
-using agilpay.models;
+﻿using ClientModels = agilpay.client.models;
+using ServerModels = agilpay.models;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
@@ -10,7 +10,6 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Web;
 
 namespace agilpay
 {
@@ -54,6 +53,16 @@ namespace agilpay
                 _httpClient.DefaultRequestHeaders.Add("SiteId", ClientId);
             }
 
+            // Default Accept header
+            _httpClient.DefaultRequestHeaders.Accept.Clear();
+            _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+            // Optional timeout from options (falls back to default if not provided)
+            if (options.TimeoutSeconds.HasValue && options.TimeoutSeconds.Value >0)
+            {
+                _httpClient.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds.Value);
+            }
+
             _jsonOptions = new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true,
@@ -86,11 +95,12 @@ namespace agilpay
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    _logger?.LogError("Failed to obtain token for ClientId={ClientId}. Status={Status}, Body={Body}", ClientId, response.StatusCode, responseBody);
-                    throw new Exception(responseBody);
+                    var truncated = Truncate(responseBody);
+                    _logger?.LogError("Failed to obtain token for ClientId={ClientId}. Status={Status}. Body(Truncated)={Body}", ClientId, response.StatusCode, truncated);
+                    throw new HttpRequestException($"POST oauth/token failed with status {(int)response.StatusCode} {response.ReasonPhrase}");
                 }
 
-                var token = JsonSerializer.Deserialize<TokenResponse>(responseBody, _jsonOptions);
+                var token = JsonSerializer.Deserialize<ClientModels.TokenResponse>(responseBody, _jsonOptions);
 
                 if (token == null)
                 {
@@ -99,7 +109,16 @@ namespace agilpay
                 }
 
                 Token = token.access_token;
-                TokenExpireTime = DateTime.UtcNow.AddSeconds(token.expires_in);
+
+                // Add a refresh skew to avoid expiry races
+                var skewSeconds =60;
+                if (token.expires_in >0 && token.expires_in <= skewSeconds)
+                {
+                    // for very short tokens keep at least half their lifespan
+                    skewSeconds = Math.Max(0, (int)(token.expires_in /2));
+                }
+                var effectiveLifetime = Math.Max(0, (int)(token.expires_in - skewSeconds));
+                TokenExpireTime = DateTime.UtcNow.AddSeconds(effectiveLifetime);
 
                 // set Authorization header on HttpClient to avoid per-request header manipulation
                 var scheme = token.token_type ?? "Bearer";
@@ -170,81 +189,82 @@ namespace agilpay
                         return result;
                     }
 
-                    _logger?.LogWarning("Request failed {Method} {Path} Status={StatusCode} Body={Body}", method, path, response.StatusCode, content);
-                    throw new Exception(content);
+                    var truncated = Truncate(content);
+                    _logger?.LogWarning("Request failed {Method} {Path} Status={StatusCode} Body(Truncated)={Body}", method, path, response.StatusCode, truncated);
+                    throw new HttpRequestException($"{method} {path} failed with status {(int)response.StatusCode} {response.ReasonPhrase}");
                 }
             }
         }
 
-        public async Task<client.models.Transaction> AuthorizePayment(AuthorizationRequest AuthorizationRequest)
+        public async Task<ClientModels.Transaction> AuthorizePayment(ClientModels.AuthorizationRequest AuthorizationRequest)
         {
             var path = "v6/Autorize";
 
             try
             {
-                var response = await ExecuteRequestAsync<client.models.Transaction>(path, HttpMethod.Post, AuthorizationRequest).ConfigureAwait(false);
-                return response ?? new client.models.Transaction { ResponseCode = "99", Status = "REJECTED", Message = "Empty response" };
+                var response = await ExecuteRequestAsync<ClientModels.Transaction>(path, HttpMethod.Post, AuthorizationRequest).ConfigureAwait(false);
+                return response ?? new ClientModels.Transaction { ResponseCode = "99", Status = "REJECTED", Message = "Empty response" };
             }
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "AuthorizePayment failed for MerchantKey={MerchantKey}", AuthorizationRequest?.MerchantKey);
-                return new client.models.Transaction { Message = ex.Message, ResponseCode = "99", Status = "REJECTED" };
+                return new ClientModels.Transaction { Message = ex.Message, ResponseCode = "99", Status = "REJECTED" };
             }
         }
 
-        public async Task<client.models.Transaction> AuthorizePaymentToken(AuthorizationTokenRequest AuthorizationRequest)
+        public async Task<ClientModels.Transaction> AuthorizePaymentToken(ClientModels.AuthorizationTokenRequest AuthorizationRequest)
         {
             var path = "v6/AuthorizeToken";
 
             try
             {
-                var response = await ExecuteRequestAsync<client.models.Transaction>(path, HttpMethod.Post, AuthorizationRequest).ConfigureAwait(false);
-                return response ?? new client.models.Transaction { ResponseCode = "99", Status = "REJECTED", Message = "Empty response" };
+                var response = await ExecuteRequestAsync<ClientModels.Transaction>(path, HttpMethod.Post, AuthorizationRequest).ConfigureAwait(false);
+                return response ?? new ClientModels.Transaction { ResponseCode = "99", Status = "REJECTED", Message = "Empty response" };
             }
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "AuthorizePaymentToken failed for MerchantKey={MerchantKey}", AuthorizationRequest?.MerchantKey);
-                return new client.models.Transaction { Message = ex.Message, ResponseCode = "99", Status = "REJECTED" };
+                return new ClientModels.Transaction { Message = ex.Message, ResponseCode = "99", Status = "REJECTED" };
             }
         }
 
-        public Task<List<CustomerAccount>> GetCustomerTokens(string CustomerID)
+        public Task<List<ServerModels.CustomerAccount>> GetCustomerTokens(string CustomerID)
         {
             var path = $"v6/GetCustomerTokens?CustomerID={Uri.EscapeDataString(CustomerID)}";
-            return ExecuteRequestAsync<List<CustomerAccount>>(path, HttpMethod.Get);
+            return ExecuteRequestAsync<List<ServerModels.CustomerAccount>>(path, HttpMethod.Get);
         }
 
-        public Task<BalanceResponse> GetBalance(BalanceRequest balanceRequest)
+        public Task<ClientModels.BalanceResponse> GetBalance(ClientModels.BalanceRequest balanceRequest)
         {
             var path = "Payment6/GetBalance";
-            return ExecuteRequestAsync<BalanceResponse>(path, HttpMethod.Post, balanceRequest);
+            return ExecuteRequestAsync<ClientModels.BalanceResponse>(path, HttpMethod.Post, balanceRequest);
         }
 
         public async Task<bool> IsValidCard(string cardNumber)
         {
             var path = $"v6/IsValidCard?CardNumber={Uri.EscapeDataString(cardNumber)}";
             var result = await ExecuteRequestAsync<string>(path, HttpMethod.Get).ConfigureAwait(false);
-            return !string.IsNullOrWhiteSpace(result) && result.Trim().Equals("true", StringComparison.OrdinalIgnoreCase);
+            return bool.TryParse(result?.Trim(), out var ok) && ok;
         }
 
         public async Task<bool> IsValidRoutingNumber(string routingNumber)
         {
             var path = $"v6/IsValidRoutingNumber?RoutingNumber={Uri.EscapeDataString(routingNumber)}";
             var result = await ExecuteRequestAsync<string>(path, HttpMethod.Get).ConfigureAwait(false);
-            return !string.IsNullOrWhiteSpace(result) && result.Trim().Equals("true", StringComparison.OrdinalIgnoreCase);
+            return bool.TryParse(result?.Trim(), out var ok) && ok;
         }
 
-        public async Task<bool> DeleteCustomerCard(DeleteTokenRequest deleteRequest)
+        public async Task<bool> DeleteCustomerCard(ClientModels.DeleteTokenRequest deleteRequest)
         {
             var path = "v6/DeleteCustomerToken";
             await ExecuteRequestAsync<string>(path, HttpMethod.Post, deleteRequest).ConfigureAwait(false);
             return true;
         }
 
-        public Task<CustomerAccount> RegisterToken(RegisterTokenRequest args)
+        public Task<ServerModels.CustomerAccount> RegisterToken(ServerModels.RegisterTokenRequest args)
         {
             var path = "v6/RegisterToken";
-            return ExecuteRequestAsync<CustomerAccount>(path, HttpMethod.Post, args);
+            return ExecuteRequestAsync<ServerModels.CustomerAccount>(path, HttpMethod.Post, args);
         }
 
         public Task<string> CloseBatchResumen(string MerchantKey)
@@ -253,76 +273,76 @@ namespace agilpay
             return ExecuteRequestAsync<string>(path, HttpMethod.Post, new { MerchantKey });
         }
 
-        public Task<client.models.Transaction> VoidById(VoidByIdRequest args)
+        public Task<ClientModels.Transaction> VoidById(ClientModels.VoidByIdRequest args)
         {
             var path = "v6/VoidByID";
-            return ExecuteRequestAsync<client.models.Transaction>(path, HttpMethod.Post, args);
+            return ExecuteRequestAsync<ClientModels.Transaction>(path, HttpMethod.Post, args);
         }
 
-        public Task<client.models.Transaction> VoidSale(VoidSaleRequest args)
+        public Task<ClientModels.Transaction> VoidSale(ClientModels.VoidSaleRequest args)
         {
             var path = "v6/VoidSale";
-            return ExecuteRequestAsync<client.models.Transaction>(path, HttpMethod.Post, args);
+            return ExecuteRequestAsync<ClientModels.Transaction>(path, HttpMethod.Post, args);
         }
 
-        public Task<client.models.Transaction> CaptureByID(VoidByIdRequest args)
+        public Task<ClientModels.Transaction> CaptureByID(ClientModels.VoidByIdRequest args)
         {
             var path = "v6/CaptureByID";
-            return ExecuteRequestAsync<client.models.Transaction>(path, HttpMethod.Post, args);
+            return ExecuteRequestAsync<ClientModels.Transaction>(path, HttpMethod.Post, args);
         }
 
-        public Task<client.models.Transaction> CaptureAdjustmendByID(CaptureAdjustmendByIDRequest args)
+        public Task<ClientModels.Transaction> CaptureAdjustmendByID(ClientModels.CaptureAdjustmendByIDRequest args)
         {
             var path = "v6/CaptureAdjustmendByID";
-            return ExecuteRequestAsync<client.models.Transaction>(path, HttpMethod.Post, args);
+            return ExecuteRequestAsync<ClientModels.Transaction>(path, HttpMethod.Post, args);
         }
 
-        public Task<client.models.Transaction> GetTransactionByID(string MerchantKey, string IDTransaction)
+        public Task<ClientModels.Transaction> GetTransactionByID(string MerchantKey, string IDTransaction)
         {
-            var path = $"v6/GetTransactionByID?MerchantKey={HttpUtility.UrlEncode(MerchantKey)}&IDTransaction={HttpUtility.UrlEncode(IDTransaction)}";
-            return ExecuteRequestAsync<client.models.Transaction>(path, HttpMethod.Get);
+            var path = $"v6/GetTransactionByID?MerchantKey={Uri.EscapeDataString(MerchantKey)}&IDTransaction={Uri.EscapeDataString(IDTransaction)}";
+            return ExecuteRequestAsync<ClientModels.Transaction>(path, HttpMethod.Get);
         }
 
-        public Task<RecurringScheduleAddResponse> RecurringScheduleAdd(RecurringScheduleAddRequest args)
+        public Task<ClientModels.RecurringScheduleAddResponse> RecurringScheduleAdd(ClientModels.RecurringScheduleAddRequest args)
         {
             var path = "v6/Recurring/Add";
-            return ExecuteRequestAsync<RecurringScheduleAddResponse>(path, HttpMethod.Post, args);
+            return ExecuteRequestAsync<ClientModels.RecurringScheduleAddResponse>(path, HttpMethod.Post, args);
         }
 
-        public Task<client.models.RecurringSchedule> RecurringScheduleGet(string MerchantKey, string Service, string CustomerId)
+        public Task<ClientModels.RecurringSchedule> RecurringScheduleGet(string MerchantKey, string Service, string CustomerId)
         {
-            var path = $"/v6/Recurring/Get?MerchantKey={HttpUtility.UrlEncode(MerchantKey)}&Service={HttpUtility.UrlEncode(Service)}&CustomerId={HttpUtility.UrlEncode(CustomerId)}";
-            return ExecuteRequestAsync<client.models.RecurringSchedule>(path, HttpMethod.Get);
+            var path = $"v6/Recurring/Get?MerchantKey={Uri.EscapeDataString(MerchantKey)}&Service={Uri.EscapeDataString(Service)}&CustomerId={Uri.EscapeDataString(CustomerId)}";
+            return ExecuteRequestAsync<ClientModels.RecurringSchedule>(path, HttpMethod.Get);
         }
 
-        public Task<RecurringScheduleAddResponse> RecurringScheduleChangeStatus(RecurringScheduleChangeStatusRequest args)
+        public Task<ClientModels.RecurringScheduleAddResponse> RecurringScheduleChangeStatus(ClientModels.RecurringScheduleChangeStatusRequest args)
         {
             var path = "v6/Recurring/Change";
-            return ExecuteRequestAsync<RecurringScheduleAddResponse>(path, HttpMethod.Post, args);
+            return ExecuteRequestAsync<ClientModels.RecurringScheduleAddResponse>(path, HttpMethod.Post, args);
         }
 
-        public Task<RecurringScheduleAddResponse> RecurringScheduleUpdate(RecurringSchedule args)
+        public Task<ClientModels.RecurringScheduleAddResponse> RecurringScheduleUpdate(ClientModels.RecurringSchedule args)
         {
             var path = "v6/Recurring/Update";
-            return ExecuteRequestAsync<RecurringScheduleAddResponse>(path, HttpMethod.Post, args);
+            return ExecuteRequestAsync<ClientModels.RecurringScheduleAddResponse>(path, HttpMethod.Post, args);
         }
 
-        public Task<client.models.Transaction> Refund(AuthorizationRequest args)
+        public Task<ClientModels.Transaction> Refund(ClientModels.AuthorizationRequest args)
         {
             var path = "Payment6/Refund";
-            return ExecuteRequestAsync<client.models.Transaction>(path, HttpMethod.Post, args);
+            return ExecuteRequestAsync<ClientModels.Transaction>(path, HttpMethod.Post, args);
         }
 
-        public Task<client.models.Transaction> RefundToken(AuthorizationTokenRequest args)
+        public Task<ClientModels.Transaction> RefundToken(ClientModels.AuthorizationTokenRequest args)
         {
             var path = "Payment6/RefundToken";
-            return ExecuteRequestAsync<client.models.Transaction>(path, HttpMethod.Post, args);
+            return ExecuteRequestAsync<ClientModels.Transaction>(path, HttpMethod.Post, args);
         }
 
-        public Task<client.models.Transaction> RefundByID(VoidByIdRequest args)
+        public Task<ClientModels.Transaction> RefundByID(ClientModels.VoidByIdRequest args)
         {
             var path = "Payment6/RefundByID";
-            return ExecuteRequestAsync<client.models.Transaction>(path, HttpMethod.Post, args);
+            return ExecuteRequestAsync<ClientModels.Transaction>(path, HttpMethod.Post, args);
         }
 
         public void Dispose()
@@ -345,6 +365,12 @@ namespace agilpay
             // Free unmanaged resources here if any
 
             _disposed = true;
+        }
+
+        private static string Truncate(string value, int maxLength =512)
+        {
+            if (string.IsNullOrEmpty(value)) return value;
+            return value.Length <= maxLength ? value : value.Substring(0, maxLength);
         }
     }
 }
