@@ -1,15 +1,15 @@
 ﻿using agilpay;
 using agilpay.client.models;
-using Newtonsoft.Json;
+using System.Text.Json;
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace TestTransaction
 {
     class Program
     {
-
-
         static async Task Main(string[] args)
         {
             try
@@ -17,26 +17,48 @@ namespace TestTransaction
                 Console.ForegroundColor = ConsoleColor.Yellow;
                 Console.WriteLine("Agilpay API Client. Test console\n");
 
+                // Collect configuration from user first
                 var _url = GetInput("URL [https://sandbox-webapi.agilpay.net/]:", "https://sandbox-webapi.agilpay.net/");
-                var client = new ApiClient(_url);
 
-                // OAUTH 2.0
+                // OAUTH2.0
                 Console.ForegroundColor = ConsoleColor.White;
                 var client_id = GetInput("Client_id [API-001]:", "API-001");
                 var secret = GetInput("Secret [Dynapay]:", "Dynapay");
 
-                await client.Init(client_id, secret);
+                // Setup DI
+                var services = new ServiceCollection();
 
-                Console.ForegroundColor = ConsoleColor.White;
-                var merchant_key = GetInput("Merchant Key [TEST-001]:", "TEST-001");
+                services.AddLogging(builder => builder.AddSimpleConsole()
+                    .SetMinimumLevel(LogLevel.Information));
 
-                string customer_id = await GetCustomerTokens(client);
+                // Register ApiClientOptions so ApiClient can consume it
+                services.AddSingleton(new ApiClientOptions { BaseUrl = _url, ClientId = client_id, ClientSecret = secret });
 
-                // Get Balance
-                await GetBalance(client, merchant_key, customer_id);
+                // Register the typed HTTP client and ApiClient implementation as IApiClient
+                services.AddHttpClient<IApiClient, ApiClient>((sp, http) =>
+                {
+                    http.BaseAddress = new Uri(_url);
+                });
 
-                // Authorize Payment
-                await AuthorizePayment(client, merchant_key, customer_id);
+                using (var provider = services.BuildServiceProvider())
+                using (var scope = provider.CreateScope())
+                {
+                    // Resolve IApiClient from DI
+                    var client = scope.ServiceProvider.GetRequiredService<IApiClient>();
+
+                    // Note: token will be acquired lazily on first request; explicit InitAsync call is not required.
+
+                    Console.ForegroundColor = ConsoleColor.White;
+                    var merchant_key = GetInput("Merchant Key [TEST-001]:", "TEST-001");
+
+                    string customer_id = await GetCustomerTokens(client);
+
+                    // Get Balance
+                    await GetBalance(client, merchant_key, customer_id);
+
+                    // Authorize Payment
+                    await AuthorizePayment(client, merchant_key, customer_id);
+                }
 
                 Console.WriteLine("Press any key...");
                 Console.ReadLine();
@@ -47,7 +69,7 @@ namespace TestTransaction
             }
         }
 
-        private static async Task<string> GetCustomerTokens(ApiClient client)
+        private static async Task<string> GetCustomerTokens(IApiClient client)
         {
             var customer_id = GetInput("Customer Account [123456]:", "123456");
 
@@ -67,7 +89,7 @@ namespace TestTransaction
             return customer_id;
         }
 
-        private static async Task AuthorizePayment(ApiClient client, string merchant_key, string customer_id)
+        private static async Task AuthorizePayment(IApiClient client, string merchant_key, string customer_id)
         {
             Console.ForegroundColor = ConsoleColor.White;
             var amount = GetInput("\nPayment Amount [1.02]:", "1.02");
@@ -96,10 +118,10 @@ namespace TestTransaction
             Console.WriteLine("Requesting authorization...");
             var resultPayment = await client.AuthorizePayment(authorizationRequest);
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("Authorization Result:\n" + JsonConvert.SerializeObject(resultPayment, Formatting.Indented));
+            Console.WriteLine("Authorization Result:\n" + JsonSerializer.Serialize(resultPayment, new JsonSerializerOptions { WriteIndented = true }));
         }
 
-        private static async Task GetBalance(ApiClient client, string merchant_key, string customer_id)
+        private static async Task GetBalance(IApiClient client, string merchant_key, string customer_id)
         {
             var balanceRequest = new BalanceRequest()
             {
@@ -109,7 +131,7 @@ namespace TestTransaction
 
             var resultBalance = await client.GetBalance(balanceRequest);
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("Balance Result:\n" + JsonConvert.SerializeObject(resultBalance, Formatting.Indented));
+            Console.WriteLine("Balance Result:\n" + JsonSerializer.Serialize(resultBalance, new JsonSerializerOptions { WriteIndented = true }));
         }   
         
         private static string GetInput(string prompt, string defaultValue)

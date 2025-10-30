@@ -1,632 +1,350 @@
-﻿
-using agilpay.client.models;
+﻿using agilpay.client.models;
 using agilpay.models;
-using Newtonsoft.Json;
-using RestSharp;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 
 namespace agilpay
 {
-    public class ApiClient
+    public class ApiClient : IApiClient, IDisposable
     {
         private string ClientId { get; set; }
         private string ClientSecret { get; set; }
         private string Token { get; set; }
         private DateTime TokenExpireTime { get; set; }
         private string BaseUrl { get; set; }
-        private RestClient client { get; set; }
+        private HttpClient _httpClient { get; set; }
         private string session_id { get; set; }
 
+        private readonly SemaphoreSlim _tokenSemaphore = new SemaphoreSlim(1,1);
+        private bool _disposed;
+        private readonly ILogger<ApiClient> _logger;
+        private readonly JsonSerializerOptions _jsonOptions;
 
-        private static readonly object locker = new object();
-        private static ApiClient _instance;
-        
-        public static ApiClient Instance
+        public ApiClient(HttpClient httpClient, ApiClientOptions options, ILogger<ApiClient> logger = null)
         {
-            get
-            {
-                lock (locker)
-                {
-                    if(_instance == null)
-                    {
-                        throw new Exception("You must call InitSingleton first");
-                    }
+            if (options == null) throw new ArgumentNullException(nameof(options));
+            BaseUrl = options.BaseUrl ?? throw new ArgumentException("BaseUrl is required", nameof(options));
+            ClientId = options.ClientId;
+            ClientSecret = options.ClientSecret;
 
-                    return _instance;
-                }
+            _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+            _httpClient.BaseAddress = new Uri(BaseUrl);
+
+            session_id = Guid.NewGuid().ToString();
+            _logger = logger;
+
+            // set headers that do not change per request
+            if (_httpClient.DefaultRequestHeaders.Contains("SessionId"))
+                _httpClient.DefaultRequestHeaders.Remove("SessionId");
+            _httpClient.DefaultRequestHeaders.Add("SessionId", session_id);
+
+            if (!string.IsNullOrWhiteSpace(ClientId))
+            {
+                if (_httpClient.DefaultRequestHeaders.Contains("SiteId"))
+                    _httpClient.DefaultRequestHeaders.Remove("SiteId");
+                _httpClient.DefaultRequestHeaders.Add("SiteId", ClientId);
             }
-        }
 
-        public static async Task<ApiClient> InitSingleton(string baseUrl, string clientId, string clientSecret)
-        {
-            lock (locker)
+            _jsonOptions = new JsonSerializerOptions
             {
-                if(_instance != null)
-                {
-                    return _instance;
-                }
-                _instance = new ApiClient(baseUrl);
-            }
-            await _instance.Init(clientId, clientSecret);
-
-            return _instance;
-        }
-
-
-        public ApiClient(string baseUrl)
-        {
-            BaseUrl = baseUrl;
-            var options = new RestClientOptions(baseUrl)
-            {
-                ThrowOnAnyError = false,
-                ThrowOnDeserializationError = false,
-                FailOnDeserializationError = false,
-                BaseUrl = new Uri(baseUrl)
-
+                PropertyNameCaseInsensitive = true,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
             };
-            client = new RestClient(options);
         }
 
-        public async Task Init(string clientId, string clientSecret)
+        public async Task InitAsync()
         {
-            session_id = Guid.NewGuid().ToString();
-            ClientId = clientId;
-            ClientSecret = clientSecret;
-            await GetOAuth2TokenAsync(BaseUrl, ClientId, ClientSecret);
+            _logger?.LogInformation("Initializing ApiClient for ClientId={ClientId}", ClientId);
+            await GetOAuth2TokenAsync().ConfigureAwait(false);
+            _logger?.LogInformation("Initialization completed; token expires at {ExpireTime}", TokenExpireTime);
         }
 
-       /* public async Task<bool> Init(string clientId, string clientSecret)
+        private async Task GetOAuth2TokenAsync()
         {
-            session_id = Guid.NewGuid().ToString();
-            ClientId = clientId;
-            ClientSecret = clientSecret;
-            //Token = await GetOAuth2TokenAsync(BaseUrl, ClientId, ClientSecret);
-            return (Token != null);
-        }*/
+            _logger?.LogDebug("Requesting OAuth2 token for ClientId={ClientId}", ClientId);
 
-        private async Task GetOAuth2TokenAsync(string _baseUrl, string _clientId, string _clientSecret)
-        {
-            string result = null;
-            try
+            var args = new Dictionary<string, string>
             {
+                { "grant_type", "client_credentials" },
+                { "client_id", ClientId },
+                { "client_secret", ClientSecret }
+            };
 
-                var client = new HttpClient() { BaseAddress = new Uri(_baseUrl) };
-
-                /*var request = new RestRequest("oauth/token").AddParameter("grant_type", "client_credentials");
-                request.AddParameter("client_id", _clientId);
-                request.AddParameter("client_secret", _clientSecret);
-                */
-
-                Dictionary<string, string> args = new Dictionary<string, string>
-                {
-                    { "grant_type", "client_credentials" },
-                    { "client_id", _clientId },
-                    { "client_secret", _clientSecret }
-                };
-
-
-                var response = await client.PostAsync("oauth/token", new FormUrlEncodedContent(args));
-
+            using (var content = new FormUrlEncodedContent(args))
+            using (var response = await _httpClient.PostAsync("oauth/token", content).ConfigureAwait(false))
+            {
+                var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    throw new Exception(await response.Content.ReadAsStringAsync());
+                    _logger?.LogError("Failed to obtain token for ClientId={ClientId}. Status={Status}, Body={Body}", ClientId, response.StatusCode, responseBody);
+                    throw new Exception(responseBody);
                 }
 
-                var token = JsonConvert.DeserializeObject<TokenResponse>(await response.Content.ReadAsStringAsync());
+                var token = JsonSerializer.Deserialize<TokenResponse>(responseBody, _jsonOptions);
 
-                if(token == null)
+                if (token == null)
                 {
+                    _logger?.LogError("Token response deserialization returned null for ClientId={ClientId}", ClientId);
                     throw new Exception("Cannot get Auth token at this time, please try later");
                 }
-                result = $"{token.token_type} {token.access_token}";
-                Token = result;
+
+                Token = token.access_token;
                 TokenExpireTime = DateTime.UtcNow.AddSeconds(token.expires_in);
 
-                /*if (response.IsSuccessStatusCode && response.Content != null)
-                {
-                    var token = JsonConvert.DeserializeObject<TokenResponse>(response.Content);
+                // set Authorization header on HttpClient to avoid per-request header manipulation
+                var scheme = token.token_type ?? "Bearer";
+                _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(scheme, Token);
 
-                    if(token == null)
-                    {
-                        return;
-                    }
-
-                    result = $"{token.token_type} {token.access_token}";
-
-                    Token = result;
-                    TokenExpireTime = DateTime.UtcNow.AddSeconds(token.expires_in);
-                }*/
-                    
-            }catch (Exception ex)
-            {
-                Console.WriteLine(ex.Message);
-                throw ex;
+                _logger?.LogInformation("Obtained OAuth2 token for ClientId={ClientId}; expires at {ExpireTime}", ClientId, TokenExpireTime);
             }
-
-            return;
         }
 
-        private async Task CheckTokenExpiration()
+        private async Task EnsureValidTokenAsync()
         {
-            if (string.IsNullOrWhiteSpace(Token))
+            if (!string.IsNullOrWhiteSpace(Token) && TokenExpireTime > DateTime.UtcNow)
             {
+                _logger?.LogDebug("Token is valid until {ExpireTime}", TokenExpireTime);
                 return;
             }
 
-            if(DateTime.Compare(TokenExpireTime, DateTime.UtcNow) < 0)
+            _logger?.LogDebug("Token expired or missing; attempting refresh for ClientId={ClientId}", ClientId);
+            await _tokenSemaphore.WaitAsync().ConfigureAwait(false);
+            try
             {
-                await GetOAuth2TokenAsync(BaseUrl, ClientId, ClientSecret);
-            }
-        }
-
-        public async Task<Transaction> AuthorizePayment(AuthorizationRequest AuthorizationRequest)
-        {
-            var request = new RestRequest("v6/Autorize") { Method = Method.Post };
-            SetHeader(request);
-
-            request.AddJsonBody(AuthorizationRequest);
-
-
-            await CheckTokenExpiration();
-
-            RestResponse response = await client.ExecuteAsync(request);
-
-
-            if (response.IsSuccessStatusCode && response.Content != null)
-            {
-                var rest = JsonConvert.DeserializeObject<Transaction>(response.Content);
-                return rest;
-            }
-            else
-            {
-                Console.WriteLine(response.Content);
-                return new Transaction
+                if (!string.IsNullOrWhiteSpace(Token) && TokenExpireTime > DateTime.UtcNow)
                 {
-                    Message = response.Content,
-                    ResponseCode = "99",
-                    Status = "REJECTED"
-                };
+                    _logger?.LogDebug("Token was refreshed by another caller; expire time {ExpireTime}", TokenExpireTime);
+                    return;
+                }
+
+                await GetOAuth2TokenAsync().ConfigureAwait(false);
+            }
+            finally
+            {
+                _tokenSemaphore.Release();
             }
         }
 
-        public async Task<Transaction> AuthorizePaymentToken(AuthorizationTokenRequest AuthorizationRequest)
+        private async Task<T> ExecuteRequestAsync<T>(string path, HttpMethod method, object body = null)
         {
-            var request = new RestRequest("v6/AuthorizeToken") { Method = Method.Post };
-            SetHeader(request);
+            await EnsureValidTokenAsync().ConfigureAwait(false);
 
-            request.AddJsonBody(AuthorizationRequest);
+            _logger?.LogDebug("Executing request {Method} {Path} (ClientId={ClientId})", method, path, ClientId);
 
-
-            await CheckTokenExpiration();
-
-            RestResponse response = await client.ExecuteAsync(request);
-
-            if (response.IsSuccessStatusCode && response.Content != null)
+            using (var request = new HttpRequestMessage(method, path))
             {
-                var rest = JsonConvert.DeserializeObject<Transaction>(response.Content);
-                return rest;
-            }
-            else
-            {
-                Console.WriteLine(response.Content);
-                return new Transaction
+                if (body != null)
                 {
-                    ResponseCode = "99",
-                    Message = response.Content,
-                    Status = "REJECTED"
-                };
+                    var json = JsonSerializer.Serialize(body, _jsonOptions);
+                    request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+                }
+
+                using (var response = await _httpClient.SendAsync(request).ConfigureAwait(false))
+                {
+                    var content = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        _logger?.LogDebug("Request succeeded {Method} {Path} Status={StatusCode}", method, path, response.StatusCode);
+
+                        // If caller expects raw string, return content directly
+                        if (typeof(T) == typeof(string))
+                        {
+                            return (T)(object)content;
+                        }
+
+                        if (string.IsNullOrWhiteSpace(content)) return default(T);
+
+                        var result = JsonSerializer.Deserialize<T>(content, _jsonOptions);
+                        _logger?.LogTrace("Deserialized response for {Path} into {Type}", path, typeof(T).FullName);
+                        return result;
+                    }
+
+                    _logger?.LogWarning("Request failed {Method} {Path} Status={StatusCode} Body={Body}", method, path, response.StatusCode, content);
+                    throw new Exception(content);
+                }
             }
         }
 
-        public async Task<List<CustomerAccount>> GetCustomerTokens(string CustomerID)
+        public async Task<client.models.Transaction> AuthorizePayment(AuthorizationRequest AuthorizationRequest)
         {
-            var request = new RestRequest("v6/GetCustomerTokens") { Method = Method.Get };
-            SetHeader(request);
+            var path = "v6/Autorize";
 
-            request.AddParameter("CustomerID", CustomerID);
-
-
-            await CheckTokenExpiration();
-
-            var response = await client.ExecuteAsync(request);
-
-            if (response.IsSuccessStatusCode && response.Content != null)
+            try
             {
-                var rest = JsonConvert.DeserializeObject<List<CustomerAccount>>(response.Content);
-                return rest;
+                var response = await ExecuteRequestAsync<client.models.Transaction>(path, HttpMethod.Post, AuthorizationRequest).ConfigureAwait(false);
+                return response ?? new client.models.Transaction { ResponseCode = "99", Status = "REJECTED", Message = "Empty response" };
             }
-            else
+            catch (Exception ex)
             {
-                Console.WriteLine(response.Content);
-                throw new Exception(response.Content);
+                _logger?.LogError(ex, "AuthorizePayment failed for MerchantKey={MerchantKey}", AuthorizationRequest?.MerchantKey);
+                return new client.models.Transaction { Message = ex.Message, ResponseCode = "99", Status = "REJECTED" };
             }
         }
 
-        public async Task<BalanceResponse> GetBalance(BalanceRequest balanceRequest)
+        public async Task<client.models.Transaction> AuthorizePaymentToken(AuthorizationTokenRequest AuthorizationRequest)
         {
-            var request = new RestRequest("Payment6/GetBalance") { Method = Method.Post };
-            SetHeader(request);
+            var path = "v6/AuthorizeToken";
 
-            request.AddJsonBody(balanceRequest);
-
-
-            await CheckTokenExpiration();
-
-            RestResponse response = await client.ExecuteAsync(request);
-
-
-            if (response.IsSuccessStatusCode && response.Content != null)
+            try
             {
-                var rest = JsonConvert.DeserializeObject<BalanceResponse>(response.Content);
-                return rest;
+                var response = await ExecuteRequestAsync<client.models.Transaction>(path, HttpMethod.Post, AuthorizationRequest).ConfigureAwait(false);
+                return response ?? new client.models.Transaction { ResponseCode = "99", Status = "REJECTED", Message = "Empty response" };
             }
-            else
+            catch (Exception ex)
             {
-                Console.WriteLine(response.Content);
-                throw new Exception(response.Content);
+                _logger?.LogError(ex, "AuthorizePaymentToken failed for MerchantKey={MerchantKey}", AuthorizationRequest?.MerchantKey);
+                return new client.models.Transaction { Message = ex.Message, ResponseCode = "99", Status = "REJECTED" };
             }
+        }
+
+        public Task<List<CustomerAccount>> GetCustomerTokens(string CustomerID)
+        {
+            var path = $"v6/GetCustomerTokens?CustomerID={Uri.EscapeDataString(CustomerID)}";
+            return ExecuteRequestAsync<List<CustomerAccount>>(path, HttpMethod.Get);
+        }
+
+        public Task<BalanceResponse> GetBalance(BalanceRequest balanceRequest)
+        {
+            var path = "Payment6/GetBalance";
+            return ExecuteRequestAsync<BalanceResponse>(path, HttpMethod.Post, balanceRequest);
         }
 
         public async Task<bool> IsValidCard(string cardNumber)
         {
-            var request = new RestRequest("v6/IsValidCard?CardNumber=" + cardNumber) { Method = Method.Get };
-
-            SetHeader(request);
-
-
-            await CheckTokenExpiration();
-
-            RestResponse response = await client.ExecuteAsync(request);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new Exception("Card number is invalid");
-            }
-
-            var result = response.Content;
-
-            return !string.IsNullOrWhiteSpace(result) && result.ToLower().Trim() == "true";
+            var path = $"v6/IsValidCard?CardNumber={Uri.EscapeDataString(cardNumber)}";
+            var result = await ExecuteRequestAsync<string>(path, HttpMethod.Get).ConfigureAwait(false);
+            return !string.IsNullOrWhiteSpace(result) && result.Trim().Equals("true", StringComparison.OrdinalIgnoreCase);
         }
 
         public async Task<bool> IsValidRoutingNumber(string routingNumber)
         {
-            var request = new RestRequest("v6/IsValidRoutingNumber?RoutingNumber=" + routingNumber) { Method = Method.Get };
-
-            SetHeader(request);
-
-
-            await CheckTokenExpiration();
-
-            RestResponse response = await client.ExecuteAsync(request);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new Exception("Routing number is invalid");
-            }
-
-            var result = response.Content;
-
-            return !string.IsNullOrWhiteSpace(result) && result.ToLower().Trim() == "true";
+            var path = $"v6/IsValidRoutingNumber?RoutingNumber={Uri.EscapeDataString(routingNumber)}";
+            var result = await ExecuteRequestAsync<string>(path, HttpMethod.Get).ConfigureAwait(false);
+            return !string.IsNullOrWhiteSpace(result) && result.Trim().Equals("true", StringComparison.OrdinalIgnoreCase);
         }
 
         public async Task<bool> DeleteCustomerCard(DeleteTokenRequest deleteRequest)
         {
-            var request = new RestRequest("v6/DeleteCustomerToken"){ Method = Method.Post };
-
-            SetHeader(request);
-
-            request.AddJsonBody(deleteRequest);
-
-
-            await CheckTokenExpiration();
-
-            RestResponse response = await client.ExecuteAsync(request);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new Exception(response.Content);
-            }
-
+            var path = "v6/DeleteCustomerToken";
+            await ExecuteRequestAsync<string>(path, HttpMethod.Post, deleteRequest).ConfigureAwait(false);
             return true;
         }
 
-        public async Task<CustomerAccount> RegisterToken(RegisterTokenRequest args)
+        public Task<CustomerAccount> RegisterToken(RegisterTokenRequest args)
         {
-            var request = new RestRequest("v6/RegisterToken") { Method = Method.Post };
-
-            SetHeader(request);
-
-            request.AddJsonBody(args);
-
-            await CheckTokenExpiration();
-
-            RestResponse response = await client.ExecuteAsync(request);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new Exception(response.Content);
-            }
-
-            return JsonConvert.DeserializeObject<CustomerAccount>(response.Content);
+            var path = "v6/RegisterToken";
+            return ExecuteRequestAsync<CustomerAccount>(path, HttpMethod.Post, args);
         }
 
-        public async Task<string> CloseBatchResumen(string MerchantKey)
+        public Task<string> CloseBatchResumen(string MerchantKey)
         {
-            var request = new RestRequest("v6/CloseBatchResumen") { Method = Method.Post };
-
-            SetHeader(request);
-
-            request.AddJsonBody(new { MerchantKey });
-
-
-            await CheckTokenExpiration();
-
-            RestResponse response = await client.ExecuteAsync(request);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new Exception(response.Content);
-            }
-
-            return response.Content;
+            var path = "v6/CloseBatchResumen";
+            return ExecuteRequestAsync<string>(path, HttpMethod.Post, new { MerchantKey });
         }
 
-        public async Task<Transaction> VoidById(VoidByIdRequest args)
+        public Task<client.models.Transaction> VoidById(VoidByIdRequest args)
         {
-            var request = new RestRequest("v6/VoidByID") { Method = Method.Post };
-
-            SetHeader(request);
-
-            request.AddJsonBody(args);
-
-
-            await CheckTokenExpiration();
-
-            RestResponse response = await client.ExecuteAsync(request);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new Exception(response.Content);
-            }
-
-            return JsonConvert.DeserializeObject<Transaction>(response.Content);
+            var path = "v6/VoidByID";
+            return ExecuteRequestAsync<client.models.Transaction>(path, HttpMethod.Post, args);
         }
 
-        public async Task<Transaction> VoidSale(VoidSaleRequest args)
+        public Task<client.models.Transaction> VoidSale(VoidSaleRequest args)
         {
-            var request = new RestRequest("v6/VoidSale") { Method = Method.Post };
-
-            SetHeader(request);
-
-            request.AddJsonBody(args);
-
-
-            await CheckTokenExpiration();
-
-            RestResponse response = await client.ExecuteAsync(request);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new Exception(response.Content);
-            }
-
-            return JsonConvert.DeserializeObject<Transaction>(response.Content);
+            var path = "v6/VoidSale";
+            return ExecuteRequestAsync<client.models.Transaction>(path, HttpMethod.Post, args);
         }
 
-        public async Task<Transaction> CaptureByID(VoidByIdRequest args)
+        public Task<client.models.Transaction> CaptureByID(VoidByIdRequest args)
         {
-            var request = new RestRequest("v6/CaptureByID") { Method = Method.Post };
-
-            SetHeader(request);
-
-            request.AddJsonBody(args);
-
-
-            await CheckTokenExpiration();
-
-            RestResponse response = await client.ExecuteAsync(request);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new Exception(response.Content);
-            }
-
-            return JsonConvert.DeserializeObject<Transaction>(response.Content);
+            var path = "v6/CaptureByID";
+            return ExecuteRequestAsync<client.models.Transaction>(path, HttpMethod.Post, args);
         }
 
-        public async Task<Transaction> CaptureAdjustmendByID(CaptureAdjustmendByIDRequest args)
+        public Task<client.models.Transaction> CaptureAdjustmendByID(CaptureAdjustmendByIDRequest args)
         {
-            var request = new RestRequest("v6/CaptureAdjustmendByID") { Method = Method.Post };
-
-            SetHeader(request);
-
-            request.AddJsonBody(args);
-
-
-            await CheckTokenExpiration();
-
-            RestResponse response = await client.ExecuteAsync(request);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new Exception(response.Content);
-            }
-
-            return JsonConvert.DeserializeObject<Transaction>(response.Content);
+            var path = "v6/CaptureAdjustmendByID";
+            return ExecuteRequestAsync<client.models.Transaction>(path, HttpMethod.Post, args);
         }
 
-        public async Task<Transaction> GetTransactionByID(string MerchantKey, string IDTransaction)
+        public Task<client.models.Transaction> GetTransactionByID(string MerchantKey, string IDTransaction)
         {
-            var request = new RestRequest("v6/GetTransactionByID?MerchantKey=" + HttpUtility.UrlEncode(MerchantKey) + "&IDTransaction=" + HttpUtility.UrlEncode(IDTransaction)) { Method = Method.Get };
-
-            SetHeader(request);
-
-
-            await CheckTokenExpiration();
-
-            RestResponse response = await client.ExecuteAsync(request);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new Exception(response.Content);
-            }
-
-            return JsonConvert.DeserializeObject<Transaction>(response.Content);
+            var path = $"v6/GetTransactionByID?MerchantKey={HttpUtility.UrlEncode(MerchantKey)}&IDTransaction={HttpUtility.UrlEncode(IDTransaction)}";
+            return ExecuteRequestAsync<client.models.Transaction>(path, HttpMethod.Get);
         }
 
-        public async Task<RecurringScheduleAddResponse> RecurringScheduleAdd(RecurringScheduleAddRequest args)
+        public Task<RecurringScheduleAddResponse> RecurringScheduleAdd(RecurringScheduleAddRequest args)
         {
-            var request = new RestRequest("v6/Recurring/Add") { Method = Method.Post };
-
-            SetHeader(request);
-
-            request.AddJsonBody(args);
-
-
-            await CheckTokenExpiration();
-
-            RestResponse response = await client.ExecuteAsync(request);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new Exception(response.Content);
-            }
-
-            return JsonConvert.DeserializeObject<RecurringScheduleAddResponse>(response.Content);
+            var path = "v6/Recurring/Add";
+            return ExecuteRequestAsync<RecurringScheduleAddResponse>(path, HttpMethod.Post, args);
         }
 
-        public async Task<RecurringSchedule> RecurringScheduleGet(string MerchantKey, string Service, string CustomerId)
+        public Task<client.models.RecurringSchedule> RecurringScheduleGet(string MerchantKey, string Service, string CustomerId)
         {
-            var request = new RestRequest("/v6/Recurring/Get?MerchantKey=" + HttpUtility.UrlEncode(MerchantKey) + "&Service=" + HttpUtility.UrlEncode(Service) + "&CustomerId=" + HttpUtility.UrlEncode(CustomerId)) { Method = Method.Get };
-
-            SetHeader(request);
-
-            await CheckTokenExpiration();
-
-            RestResponse response = await client.ExecuteAsync(request);
-
-
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new Exception(response.Content);
-            }
-
-            return JsonConvert.DeserializeObject<RecurringSchedule>(response.Content);
+            var path = $"/v6/Recurring/Get?MerchantKey={HttpUtility.UrlEncode(MerchantKey)}&Service={HttpUtility.UrlEncode(Service)}&CustomerId={HttpUtility.UrlEncode(CustomerId)}";
+            return ExecuteRequestAsync<client.models.RecurringSchedule>(path, HttpMethod.Get);
         }
 
-        public async Task<RecurringScheduleAddResponse> RecurringScheduleChangeStatus(RecurringScheduleChangeStatusRequest args)
+        public Task<RecurringScheduleAddResponse> RecurringScheduleChangeStatus(RecurringScheduleChangeStatusRequest args)
         {
-            var request = new RestRequest("v6/Recurring/Change") { Method = Method.Post };
-
-            SetHeader(request);
-
-            request.AddJsonBody(args);
-
-
-            await CheckTokenExpiration();
-
-            RestResponse response = await client.ExecuteAsync(request);
-
-
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new Exception(response.Content);
-            }
-
-            return JsonConvert.DeserializeObject<RecurringScheduleAddResponse>(response.Content);
+            var path = "v6/Recurring/Change";
+            return ExecuteRequestAsync<RecurringScheduleAddResponse>(path, HttpMethod.Post, args);
         }
 
-        public async Task<RecurringScheduleAddResponse> RecurringScheduleUpdate(RecurringSchedule args)
+        public Task<RecurringScheduleAddResponse> RecurringScheduleUpdate(RecurringSchedule args)
         {
-            var request = new RestRequest("v6/Recurring/Update") { Method = Method.Post };
-
-            SetHeader(request);
-
-            request.AddJsonBody(args);
-
-            await CheckTokenExpiration();
-
-            RestResponse response = await client.ExecuteAsync(request);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new Exception(response.Content);
-            }
-
-            return JsonConvert.DeserializeObject<RecurringScheduleAddResponse>(response.Content);
+            var path = "v6/Recurring/Update";
+            return ExecuteRequestAsync<RecurringScheduleAddResponse>(path, HttpMethod.Post, args);
         }
 
-        public async Task<Transaction> Refund(AuthorizationRequest args)
+        public Task<client.models.Transaction> Refund(AuthorizationRequest args)
         {
-            var request = new RestRequest("Payment6/Refund") { Method = Method.Post };
-
-            SetHeader(request);
-
-            request.AddJsonBody(args);
-
-            await CheckTokenExpiration();
-
-            RestResponse response = await client.ExecuteAsync(request);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new Exception(response.Content);
-            }
-
-            return JsonConvert.DeserializeObject<Transaction>(response.Content);
+            var path = "Payment6/Refund";
+            return ExecuteRequestAsync<client.models.Transaction>(path, HttpMethod.Post, args);
         }
 
-        public async Task<Transaction> RefundToken(AuthorizationTokenRequest args)
+        public Task<client.models.Transaction> RefundToken(AuthorizationTokenRequest args)
         {
-            var request = new RestRequest("Payment6/RefundToken") { Method = Method.Post };
-
-            SetHeader(request);
-
-            request.AddJsonBody(args);
-
-            await CheckTokenExpiration();
-
-            RestResponse response = await client.ExecuteAsync(request);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new Exception(response.Content);
-            }
-
-            return JsonConvert.DeserializeObject<Transaction>(response.Content);
+            var path = "Payment6/RefundToken";
+            return ExecuteRequestAsync<client.models.Transaction>(path, HttpMethod.Post, args);
         }
 
-        public async Task<Transaction> RefundByID(VoidByIdRequest args)
+        public Task<client.models.Transaction> RefundByID(VoidByIdRequest args)
         {
-            var request = new RestRequest("Payment6/RefundByID") { Method = Method.Post };
-
-            SetHeader(request);
-
-            request.AddJsonBody(args);
-
-            await CheckTokenExpiration();
-
-            RestResponse response = await client.ExecuteAsync(request);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new Exception(response.Content);
-            }
-
-            return JsonConvert.DeserializeObject<Transaction>(response.Content);
+            var path = "Payment6/RefundByID";
+            return ExecuteRequestAsync<client.models.Transaction>(path, HttpMethod.Post, args);
         }
 
-        private void SetHeader(RestRequest request)
+        public void Dispose()
         {
-            request.AddHeader("Content-Type", "application/json")
-                                .AddHeader("SessionId", session_id)
-                                .AddHeader("SiteId", ClientId)
-                                .AddHeader("Authorization", Token);
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (_disposed) return;
+
+            if (disposing)
+            {
+                _tokenSemaphore?.Dispose();
+                // Do not dispose injected HttpClient as DI container owns it
+                // Dispose other managed resources here if needed
+            }
+
+            // Free unmanaged resources here if any
+
+            _disposed = true;
         }
     }
 }
