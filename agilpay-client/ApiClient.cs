@@ -21,7 +21,7 @@ namespace agilpay
         private DateTime TokenExpireTime { get; set; }
         private string BaseUrl { get; set; }
         private HttpClient _httpClient { get; set; }
-        private string session_id { get; set; }
+        private string Session_id { get; set; }
 
         private readonly SemaphoreSlim _tokenSemaphore = new SemaphoreSlim(1,1);
         private bool _disposed;
@@ -38,13 +38,13 @@ namespace agilpay
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _httpClient.BaseAddress = new Uri(BaseUrl);
 
-            session_id = Guid.NewGuid().ToString();
+            Session_id = Guid.NewGuid().ToString();
             _logger = logger;
 
             // set headers that do not change per request
             if (_httpClient.DefaultRequestHeaders.Contains("SessionId"))
                 _httpClient.DefaultRequestHeaders.Remove("SessionId");
-            _httpClient.DefaultRequestHeaders.Add("SessionId", session_id);
+            _httpClient.DefaultRequestHeaders.Add("SessionId", Session_id);
 
             if (!string.IsNullOrWhiteSpace(ClientId))
             {
