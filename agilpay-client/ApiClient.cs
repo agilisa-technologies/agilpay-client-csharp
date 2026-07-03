@@ -675,6 +675,44 @@ namespace agilpay
             return JsonConvert.DeserializeObject<Transaction>(msg);
         }
 
+        public async Task<TempLinkCreateResponse> TempLinkCreate(TempLinkCreateRequest request)
+        {
+            await CheckTokenExpiration();
+
+            var json = JsonConvert.SerializeObject(request);
+
+            var response = await client.PostAsync("Links/Create", new StringContent(json, Encoding.UTF8, "application/json"));
+
+            var msg = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new Exception(msg);
+            }
+
+            return JsonConvert.DeserializeObject<TempLinkCreateResponse>(msg);
+        }
+
+        public async Task TempLinkUpdate(string key, string status, string notes = null)
+        {
+            await CheckTokenExpiration();
+
+            var json = JsonConvert.SerializeObject(new { Key = key, Status = status, Notes = notes });
+
+            var request = new HttpRequestMessage(new HttpMethod("PATCH"), "Links/Update")
+            {
+                Content = new StringContent(json, Encoding.UTF8, "application/json")
+            };
+
+            var response = await client.SendAsync(request);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var msg = await response.Content.ReadAsStringAsync();
+                throw new Exception(msg);
+            }
+        }
+
         private void SetHeader()
         {
             client.DefaultRequestHeaders.Add("SessionId", session_id);
