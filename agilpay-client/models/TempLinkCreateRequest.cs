@@ -7,8 +7,7 @@ namespace agilpay.models
     public class TempLinkCreateRequest
     {
         public string UniqueKey { get; set; }
-        public DateTime Fecha { get; set; }
-        public decimal Monto { get; set; }
+        public decimal Amount { get; set; }
         public string MerchantKey { get; set; }
         public string SiteId { get; set; }
         public string Currency { get; set; } = "840";
