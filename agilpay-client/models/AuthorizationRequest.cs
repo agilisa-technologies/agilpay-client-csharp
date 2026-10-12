@@ -39,5 +39,8 @@ namespace agilpay.client.models
 
         public string NameOnAccount { get; set; }
         public ThreeDS ThreeDS { get; set; }
+
+        public string Agreement { get; set; } = null;
+        public string Sequence { get; set; } = null;
     }
 }

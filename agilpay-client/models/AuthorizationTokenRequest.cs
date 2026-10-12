@@ -24,6 +24,9 @@ namespace agilpay.client.models
         public bool IsInstallments { get; set; }
         public int InstallmentsCount { get; set; }
 
+        public string Agreement { get; set; } = null;
+        public string Sequence { get; set; } = null;
+
         //public bool ForceDuplicate { get; set; }
 
         //public ThreeDS ThreeDS { get; set; }
