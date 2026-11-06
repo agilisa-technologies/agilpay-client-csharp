@@ -11,6 +11,6 @@ namespace agilpay.models
 
         public string ExtData { get; set; }
 
-        public decimal Amount { get; set; } = 0;
+        public decimal? Amount { get; set; }
     }
 }
