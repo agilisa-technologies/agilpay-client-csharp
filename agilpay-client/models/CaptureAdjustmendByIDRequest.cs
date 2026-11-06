@@ -11,5 +11,7 @@ namespace agilpay.client.models
         public string MerchantKey { get; set; }
         public string IDTransaction { get; set; }
         public string Amount { get; set; }
+
+        public string ExtData { get; set; }
     }
 }

@@ -1,4 +1,5 @@
-﻿using agilpay;
+﻿
+using agilpay;
 using agilpay.client.models;
 using Newtonsoft.Json;
 using System;
@@ -17,9 +18,12 @@ namespace TestTransaction
                 Console.ForegroundColor = ConsoleColor.Yellow;
                 Console.WriteLine("Agilpay API Client. Test console\n");
 
-                var _url = GetInput("URL [https://sandbox-webapi.agilpay.net/]:", "https://sandbox-webapi.agilpay.net/");
-                var client = new ApiClient(_url);
+                Console.Write("URL [https://sandbox-webapi.agilpay.net/]:");
 
+                var _url = Console.ReadLine();
+                _url = string.IsNullOrEmpty(_url) ? "https://sandbox-webapi.agilpay.net/" : _url;                
+
+                var client = new ApiClient(_url);
                 // OAUTH 2.0
                 Console.ForegroundColor = ConsoleColor.White;
                 var client_id = GetInput("Client_id [API-001]:", "API-001");
@@ -27,96 +31,77 @@ namespace TestTransaction
 
                 await client.Init(client_id, secret);
 
-                Console.ForegroundColor = ConsoleColor.White;
-                var merchant_key = GetInput("Merchant Key [TEST-001]:", "TEST-001");
-
-                string customer_id = await GetCustomerTokens(client);
-
-                // Get Balance
-                await GetBalance(client, merchant_key, customer_id);
-
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    break;
+                }
                 // Authorize Payment
                 await AuthorizePayment(client, merchant_key, customer_id);
 
-                Console.WriteLine("Press any key...");
-                Console.ReadLine();
-            }
-            catch (Exception e)
-            {
-                Console.Write(e.Message);
-            }
-        }
+                ///Console.ForegroundColor = ConsoleColor.White;
+                Console.Write("Merchant Key [TEST-001]:");
 
         private static async Task<string> GetCustomerTokens(ApiClient client)
         {
             var customer_id = GetInput("Customer Account [123456]:", "123456");
 
-            var resultTokens = await client.GetCustomerTokens(customer_id);
-            if (resultTokens != null && resultTokens.Count > 0)
-            {
-                foreach (var item in resultTokens)
+                Console.Write("Customer Account [010957593]:");
+                var customer_id = Console.ReadLine();
+                customer_id = string.IsNullOrEmpty(customer_id) ? "010957593" : customer_id;
+
+                Console.WriteLine();
+                Console.Write("Register token? Y/N: ");
+
+                var go = Console.ReadLine();
+
+                if (go.ToUpper().Trim() == "Y")
                 {
-                    Console.WriteLine($"{item.Account}");
+
+                    var newToken = await client.RegisterToken(new agilpay.models.RegisterTokenRequest
+                    {
+                        CustomerId = customer_id,
+                        AccountType = "1",
+                        AccountNumber = "5252525252525252",
+                        CVV = "123",
+                        CustomerEmail = "test@gmail.com",
+                        CustomerName = "pruebas",
+                        ExpirationMonth = "07",
+                        ExpirationYear = "2028",
+                        MerchantKey = merchant_key,
+                        NameOnAccount = "pruebas",
+                        ZipCode = "12345"
+
+                    });
+
+                    Console.WriteLine("new token: " + JsonConvert.SerializeObject(newToken));
                 }
+
+                Console.WriteLine("Customer tokens:");
+                var resultTokens = await client.GetCustomerTokens(customer_id);
+                if (resultTokens != null)
+                {
+                    foreach (var item in resultTokens)
+                    {
+                        Console.WriteLine($"{item.Account}");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("No tokens found");
+                }
+
+               
+
+
             }
-            else
+            catch(Exception e)
             {
-                Console.WriteLine("No tokens found");
+                Console.Write(e.Message);
             }
 
-            return customer_id;
-        }
 
-        private static async Task AuthorizePayment(ApiClient client, string merchant_key, string customer_id)
-        {
-            Console.ForegroundColor = ConsoleColor.White;
-            var amount = GetInput("\nPayment Amount [1.02]:", "1.02");
-            double.TryParse(amount, out double amountDouble);
 
-            var card = GetInput("\nPayment Account [4242-4242-4242-4242]:", "4242424242424242");
 
-            var authorizationRequest = new AuthorizationRequest()
-            {
-                MerchantKey = merchant_key,
-                AccountNumber = card,
-                ExpirationMonth = "01",
-                ExpirationYear = "29",
-                CustomerName = "Test User",
-                CustomerID = customer_id,
-                AccountType = AccountType.Credit_Debit,
-                CustomerEmail = "testuser@gmail.com",
-                ZipCode = "33167",
-                Amount = amountDouble,
-                Currency = "840",
-                Tax = 0.0,
-                Invoice = "123465465",
-                Transaction_Detail = "payment information detail"
-            };
 
-            Console.WriteLine("Requesting authorization...");
-            var resultPayment = await client.AuthorizePayment(authorizationRequest);
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("Authorization Result:\n" + JsonConvert.SerializeObject(resultPayment, Formatting.Indented));
-        }
-
-        private static async Task GetBalance(ApiClient client, string merchant_key, string customer_id)
-        {
-            var balanceRequest = new BalanceRequest()
-            {
-                MerchantKey = merchant_key,
-                CustomerId = customer_id,
-            };
-
-            var resultBalance = await client.GetBalance(balanceRequest);
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("Balance Result:\n" + JsonConvert.SerializeObject(resultBalance, Formatting.Indented));
-        }   
-        
-        private static string GetInput(string prompt, string defaultValue)
-        {
-            Console.Write(prompt);
-            var input = Console.ReadLine();
-            return string.IsNullOrEmpty(input) ? defaultValue : input;
         }
     }
 }

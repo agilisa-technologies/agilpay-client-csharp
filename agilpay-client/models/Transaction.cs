@@ -9,6 +9,8 @@ namespace agilpay.client.models
     public class Transaction
     {
         public string Account { get; set; } = string.Empty;
+
+        public string Invoice { get; set; }
         public string AccountToken { get; set; } = string.Empty;
         public string IDTransaction { get; set; } = "0";
         public string BatchCode { get; set; } = string.Empty;
